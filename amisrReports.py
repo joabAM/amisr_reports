@@ -8,7 +8,7 @@ import os
 
 
 online = 0 # True or False 1 o 0
-startdate = '2021/08/15'  #formato yyyy/mm/dd para offline
+startdate = '2021/12/01'  #formato yyyy/mm/dd para offline
 enddate = '2021/12/16'   #para offline
 hostname = '127.0.0.1 '
 username = 'soporte'
@@ -53,49 +53,60 @@ bz2path = curr_path+"/bz2dir/"
 def main():
 
     ################################ESCRIBIR BASES DE DATOS en CSV
+    ###objeto base de datos
     dbObj = amisrDB.DB_AMISR(xml_path,bz2path,dataBasePath, hostname, username,
                            password, online=False)
 
     ###dbObj.writeDB(startdate, enddate, dataType) #escribir base de datos
 
-    DataDB = dbObj.readDB("power",startdate,enddate,rtl2PD=True) #objeto con información en Pandas DataFrame
-    """Objeto para lectura de datos de gráficos antiguos"""
-    DataPlot1 = dbObj.readDB("power",startdate,enddate,rtl2PD=False,show_plot=show_plot,
-            aeuStatus=False, plot_interval=0.5, panels_plot_list =panels_plot_list,
-            aeus_plot_list=aeus_plot_list, aeus_plot_range=aeus_plot_range,
-            plot_interval_panel_list=plot_interval_panel_list)
+    DataDB = dbObj.readDB("power",startdate,enddate) #objeto con información en Pandas DataFrame
+    # """Objeto para lectura de datos de gráficos antiguos"""
+    #
 
-    stats = STATS_AMISR("power", DataDB, navg=30 )
-    plotObj1 = Plot_amisrDB("power",panel_average=panel_average,aeus_plot_list=aeus_plot_list,
-            show_plot_bar = False)
+    #lectura de ALARMA, solo vswr, retorna data y date
+    # DataAlarm = dbObj.readDB("alarm",startdate,enddate,rtl2PD=False,show_plot=show_plot,
+    #         aeuStatus=True, plot_interval=2, alarmType="vswr")
 
-    plotObj1.setRadarList(dbObj.getPanelList())
+    stats = STATS_AMISR(type="power", data=DataDB )
+    #stats = STATS_AMISR()#contructor vacio, prueba de alarmas
+    # plotObj1 = Plot_amisrDB("power",panel_average=panel_average,aeus_plot_list=aeus_plot_list,
+    #         show_plot_bar = False)
 
-    """show_plot = [1, 0, 0, 0] primero solo potencia general"""
-    power_figure = plotObj1.getPlot(plot_format, show_plot, DataPlot1[0], DataPlot1[1], DataPlot1[2], DataPlot1[3],
-                    DataPlot1[4], DataPlot1[5], DataPlot1[6], panels_plot_list)
+    #
+    # #plotObj2 = Plot_amisrDB("alarm") #antig{uo ploteo}
+    #
+    # """show_plot = [1, 0, 0, 0] primero solo potencia general"""
 
 
-    report = Report(stats.startdate,stats.enddate)
+
+
+    report = Report(stats.startdate,stats.enddate)   #clase pdf report
+
 
     stats.updateNPows() # para getStatsTx y correlation
     stats.updateStatusTable()#necesario para los valores del pie, y las tablas
 
+    #fig_alarm = stats.getPlotsAlarms(DataAlarm)
+    power_figure = stats.getPlotTotal("power",interval=60)
+    #
+    # fig_stats = stats.getStatsTx()
+    # fig_xcorr = stats.getCrossCorrelation()
+    # figs_pie, values_pie = stats.getPieRep()
+    # fig_rate, rate = stats.getRateFig("cero")
+    # table_over, total_pow = stats.getOverview() #ejecutar getRateFig() antes
 
-    fig_stats = stats.getStatsTx()
-    fig_xcorr = stats.getCrossCorrelation()
-    figs_pie, values_pie = stats.getPieRep()
-    fig_rate, rate = stats.getRateFig("cero")
-    table_over, total_pow = stats.getOverview() #ejecutar getRateFig() antes
-
-    report.add_overview(table_over, total_pow, power_figure[0])
-    report.addFigure(figs_pie, "pie", values_pie)
-    report.addFigure(fig_stats, "stats")
-    report.addFigure(fig_xcorr, "correlation")
+    #stats.show()
 
     #
-    report.getReport()
-
+    # report.add_overview(table_over, total_pow, power_figure[0])
+    # report.addFigure(figs_pie, "pie", values_pie)
+    # report.addFigure(fig_stats, "stats")
+    # report.addFigure(fig_xcorr, "correlation")
+    # report.addFigure(fig_alarm, "alarm", None)
+    #
+    # #
+    # report.getReport()
+    #
 
 
 
@@ -115,7 +126,7 @@ def main():
 
     #datos para pandas en lista
     #
-    # DataPlot1 = dbObj.readDB("power",startdate,enddate,rtl2PD=False,show_plot=show_plot,
+    # DataPower = dbObj.readDB("power",startdate,enddate,rtl2PD=False,show_plot=show_plot,
     #         aeuStatus=False, plot_interval=0.5, panels_plot_list =panels_plot_list,
     #         aeus_plot_list=aeus_plot_list, aeus_plot_range=aeus_plot_range,
     #         plot_interval_panel_list=plot_interval_panel_list)
@@ -127,8 +138,8 @@ def main():
     # #plotObj.getPlot(plot_format, show_plot, y_p_total, y_p_total_xml,y_panel,
     # #y_aeu, y_nInt,y_nInt_panel, x):
     # plotObj1.setRadarList(dbObj.getPanelList())
-    # plotObj1.getPlot(plot_format, show_plot, DataPlot1[0], DataPlot1[1], DataPlot1[2], DataPlot1[3],
-    #                 DataPlot1[4], DataPlot1[5], DataPlot1[6], panels_plot_list)
+    # plotObj1.getPlot(plot_format, show_plot, DataPower[0], DataPower[1], DataPower[2], DataPower[3],
+    #                 DataPower[4], DataPower[5], DataPower[6], panels_plot_list)
 
 
 

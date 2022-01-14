@@ -16,20 +16,13 @@ import csv
 from pytz import timezone
 import numpy as np
 import paramiko
+import pandas as pd
 
 import aeustatus_sri as aeuST
 import fileinput
 
-def aeu_to_rc(aeu):
-    col = int(aeu//225) + 1
-    if col == 2 :
-        aeu = aeu - 224
-    row = int(aeu//32) + 1
-    n = aeu%32
-    if n == 0:
-        n = 32
-        row -= 1
-    return row, col, n
+from utils import *
+
 
 '''
 Numeración de Paneles 1 al 14
@@ -46,15 +39,8 @@ Panel 12 -> R05-C02
 Panel 13 -> R06-C02
 Panel 14 -> R07-C02
 '''
-def rc_to_aeu(row, col, n):
-    pos_p = ((col-1)*7 +(row-1))*32
-    pos_p = pos_p + n  # position from 1 to 448
-    return pos_p
 
-dictDataType = {"power":1, "current":2, "alarms":3, "temperature":4,
-                "SSPA volts":5, "volts dir":6, "volts rev":7,
-                "-8 volts":8
-                }
+
 
 class DB_AMISR ():
 
@@ -96,7 +82,7 @@ class DB_AMISR ():
         return self.show_all_panel, self.aeus_plot_range
 
     def definePath(self,dataType):
-
+        #usa números yase ha usado decodeDataType()
         if dataType>7 and dataType <1:
             print("Invalid data type to write...")
             return 0
@@ -389,7 +375,7 @@ class DB_AMISR ():
 
     def writeDB(self, startdate, enddate, dataType):
 
-        dataType = dictDataType[dataType]
+        dataType =  decodeDataType(dataType)
         self.definePath(dataType)
         self.startdate = startdate
         self.enddate = enddate
@@ -428,16 +414,316 @@ class DB_AMISR ():
 
 
 
-    def readDB(self,dataType, start_plot_date,end_plot_date,rtl2PD=False, show_plot=False, aeuStatus = False, plot_interval=1,
-                panels_plot_list=None, aeus_plot_list=None, aeus_plot_range = None, plot_interval_panel_list=None):
+    # def readDB(self,dataType, start_plot_date,end_plot_date,rtl2PD=False, show_plot=False, aeuStatus = False, plot_interval=1,
+    #             panels_plot_list=None, aeus_plot_list=None, aeus_plot_range = None, plot_interval_panel_list=None, alarmType="none"):
+    #
+    #     return_lines_to_PD = rtl2PD
+    #     dataType =  decodeDataType(dataType)
+    #     self.definePath(dataType)
+    #     self.show_all_panel = []  #número panel
+    #     self.aeu_plot_list = [] #lista de AEUs se almacenan en formato 1 a 448
+    #     self.panel_plot_list = []    #lista de paneles se almacenan en formato 1 a 14
+    #     self.aeus_plot_range = aeus_plot_range
+    #
+    #     start_plot_date = start_plot_date.replace('/','-')
+    #     end_plot_date = end_plot_date.replace('/','-')
+    #
+    #     real_start_date = None
+    #     real_end_date = None
+    #
+    #     valid_interval = [0, 0.1, 0.5, 1, 2, 6, 12, 24] #el doble de lo ingresado
+    #     interval = float(plot_interval)  #
+    #     if not(interval in valid_interval):
+    #         print("Invalid time interval for plot, use 0, '0.1', '0.5', '1', '2', '6', '12' or '24' hours")
+    #         return
+    #     interval *=60 # ahora interval en minutos interval = 2*15*plot_interval
+    #     if interval == 0:
+    #         interval = 1
+    #     print("data Prom: {:2d} min".format(int(interval)))
+    #
+    #     if self.DataType == 1: #solo para potencia
+    #         startIndex = 10
+    #     else:
+    #         startIndex = 2
+    #
+    #     datelist = []
+    #     csvData = []
+    #     day_lines = []
+    #     x = []
+    #     y_p_total = []      #potencia de la suma de todas las
+    #     y_p_total_xml = []
+    #
+    #     plot_pow_list = [] #lista de paneles, para mostrar intervalos de potencia
+    #
+    #
+    #     s_date = ''
+    #     e_date = ''
+    #     #Cambiar los datos de las AEUS a una solo lista
+    #     #verificar el rango
+    #
+    #     #Alarmas vacio para las 448 y el total de promedio
+    #     dataAlarms = pd.Series(0, index=range(448))
+    #
+    #     if not return_lines_to_PD and not aeuStatus:
+    #         for r,c,n in aeus_plot_list:
+    #             if r > 7 or r < 1:
+    #                 print("Invalid value to row number /aeu_list")
+    #                 return
+    #             if c > 2 or c < 1:
+    #                 print("Invalid value to colum number /aeu_list")
+    #                 return
+    #
+    #             if n > 32 or n < -1:
+    #                 print("Invalid value to AEU number /aeu_list")
+    #                 return
+    #
+    #             if n == 0:      ###plot all panel
+    #                 for i in range(32):
+    #                     self.aeu_plot_list.append(rc_to_aeu(r,c,(i+1)))
+    #                 self.show_all_panel.append([r,c])
+    #                 self.aeus_plot_range = [1,32]
+    #             elif n == -1:      ###plot block panel
+    #                 for i in range(self.aeus_plot_range[0],self.aeus_plot_range[1]+1):
+    #                     self.aeu_plot_list.append(rc_to_aeu(r,c,i))
+    #                 self.show_all_panel.append([r,c])
+    #             else:
+    #                 self.aeu_plot_list.append(rc_to_aeu(r,c,n))
+    #         #print(self.aeu_plot_list)
+    #         #cambiar y verificar la lista de entrada para
+    #         #graficar paneles
+    #         for r,c in panels_plot_list:
+    #             if r > 7 or r < 1:
+    #                 print("Invalid value to row number /panel_list")
+    #                 return
+    #             if c > 2 or c < 1:
+    #                 print("Invalid value to colum number /panel_list")
+    #                 return
+    #             self.panel_plot_list.append(rc_to_aeu(r,c,32)/32)
+    #
+    #
+    #         for r,c in plot_interval_panel_list:
+    #             if r > 7 or r < 1:
+    #                 print("Invalid value to row number /interval_panel_list")
+    #                 return
+    #             if c > 2 or c < 1:
+    #                 print("Invalid value to colum number /interval_panel_list")
+    #                 return
+    #             plot_pow_list.append(int(rc_to_aeu(r,c,32)/32))
+    #
+    #     y_panel = [[] for i in range(len(self.panel_plot_list))]
+    #     y_aeu = [[] for i in range(len(self.aeu_plot_list))]
+    #     y_nInt = [[] for i in range(9)] # 9 = intervals(7)+ good + bad
+    #     y_nInt_panel = [[[] for i in range(7)] for k in range(14)]
+    #     aeu_alarms = [[] for i in range(448)]
+    #     aeu_alarms = pd.DataFrame(columns=range(449))
+    #     alarm_date = []
+    #     i_df = 0
+    #     if os.path.isfile(self.csvpathfile):
+    #
+    #         with fileinput.input([self.csvpathfile]) as csvFile:
+    #
+    #             s_date = start_plot_date
+    #             e_date = end_plot_date
+    #
+    #             print(s_date, e_date)
+    #             s_date = datetime.datetime.strptime(s_date,"%Y-%m-%d").date()
+    #             e_date = datetime.datetime.strptime(e_date,"%Y-%m-%d").date() + datetime.timedelta(days=1)
+    #             day_date = s_date
+    #             flag_remnantData = False
+    #
+    #             index_line = 1   #  Nro de linea
+    #             valid_lines = 0
+    #             M = 0
+    #             #print("tot lines",len(lines))
+    #             for line in csvFile:          #cada línea de la lista son muestras cada 1 min
+    #                 line = line.rstrip("\n")
+    #                 line = line.split(",")
+    #                 date = datetime.datetime.strptime(line[0]+line[1],"%Y-%m-%d%H:%M:%S")
+    #
+    #                 if fileinput.isstdin() and len(day_lines)>1 :
+    #                     flag_remnantData = True
+    #                 if (date.date() >= s_date and date.date() <= e_date) or flag_remnantData:       #Rango de fechas validos
+    #                     #print(index_line)
+    #                     #-----------------------------------------------------------------------------------------
+    #                     if return_lines_to_PD:              #índice de línea
+    #                         day_lines.append(line)
+    #                         continue
+    #
+    #                     new_date = date.date()
+    #                     if new_date > day_date or fileinput.isstdin(): #hasta aquí se tiene una lista de todo 1 día
+    #
+    #                         #print(new_date)
+    #                         k = 0
+    #                         S_acum_1 = 0  #suma de AEUs
+    #                         S_acum_2 = 0  #potencia pico xml
+    #                         S_p_acum = [0]*len(self.panel_plot_list)
+    #                         S_aeu_acum = [0]*len(self.aeu_plot_list)
+    #                         S_n_acum = [0]*9
+    #                         S_n_acum_panel = [[0 for x in range(7)] for n in range(14)]
+    #                         #print("daylines", len(day_lines))
+    #
+    #                         for _l in day_lines:    #todas las lineas del día
+    #                             k += 1
+    #                             if not aeuStatus:
+    #                                 #*********************************************************************************
+    #                                 if show_plot[0] == 1: # potencia total
+    #                                     S = sum(float(j) for j in _l[startIndex:(startIndex+448)])#Suma todas las AEUs
+    #                                     S_acum_1 += S
+    #                                     S_acum_2 += float(_l[7])
+    #                                 #*********************************************************************************
+    #                                 if show_plot[1] == 1: # potencia panel
+    #                                     #N_panel  del 1 al 14
+    #                                     m = 0
+    #                                     for pl in self.panel_plot_list:
+    #                                         init_panel = startIndex + (int(pl)-1)*32
+    #                                         end_panel =  startIndex + int(pl)*32
+    #                                         S = sum(float(j) for j in _l[init_panel:end_panel]) #suma de panel
+    #                                         #S = sum(float(j) for j in _l[init_panel:end_panel])/32 #promedio de panel
+    #                                         S_p_acum[m] += S
+    #                                         m += 1
+    #                                 #*********************************************************************************
+    #                                 if show_plot[2] == 1: # potencia aeu
+    #                                     m = 0
+    #                                     #print(self.aeu_plot_list)
+    #                                     for nAeu in self.aeu_plot_list:
+    #                                         #print(_l[startIndex + int(nAeu)-1])
+    #                                         S = float(_l[startIndex + int(nAeu)-1]) #Suma la AEUs
+    #                                         S_aeu_acum[m] += S
+    #                                         m += 1
+    #                                 #*********************************************************************************
+    #                                 if show_plot[3] == 1: # potencia stat [458]
+    #                                     i = 7
+    #                                     i_0 = 458
+    #                                     for l in range(14):#para cada panel
+    #                                         nt = _l[i_0:i_0+i] #avanza de 7 en 7
+    #                                         i_0 = i_0 + 7 #nuevo inicio
+    #                                         m = 0
+    #                                         for q in nt:
+    #                                             S = float(q)
+    #                                             S_n_acum_panel[l][m] += S
+    #                                             S_n_acum[m] += S
+    #                                             m += 1
+    #                                             M += S
+    #                                     S_n_acum[7] += float(_l[2])    #good
+    #                                     S_n_acum[8] += float(_l[4])    #bad
+    #                                     #print("total: ", sum(S_n_acum))
+    #
+    #                             #*********************************************************************************
+    #                             ###if aeuStatus and (new_date == plot_status_day) : #para 1 solo día #ALARMA
+    #                             else:
+    #
+    #                                 listA = [int(float(n)) for n in _l[startIndex:(startIndex+448)+1]]
+    #                                 df = pd.Series(listA)
+    #
+    #                                 df = df.where(df == decodeAlarm(alarmType))
+    #                                 df.fillna(value=0, inplace=True)
+    #                                 df = df.astype('int64')
+    #
+    #                                 dataAlarms = dataAlarms | df
+    #
+    #                                 if k == interval:
+    #                                     date= _l[0]+' '+_l[1][:5]
+    #                                     k = 0
+    #                                     aux = [date]+dataAlarms.tolist()
+    #                                     aeu_alarms.loc[i_df] = aux
+    #                                     dataAlarms = pd.Series(0, index=range(448)) #reinicio
+    #                                     i_df += 1
+    #                                 # i = 0
+    #                                 # for v in _l[startIndex:(startIndex+448)+1]:
+    #                                 #     #print(aeu_alarms)
+    #                                 #     aeu_alarms[i].append(v)
+    #                                 #     i += 1
+    #                                 # alarm_date.append(datetime.datetime.strptime(_l[0]+'_'+_l[1][:5],"%Y-%m-%d_%H:%M"))
+    #                                 continue
+    #                             #*********************************************************************************
+    #                             #*********************************************************************************
+    #                             #*********************************************************************************
+    #                             #******************************* WRITE AND RESET**********************************
+    #                             if k == interval and (not aeuStatus):
+    #                                 #********act Pot total
+    #                                 q =datetime.datetime.strptime(_l[0]+'_'+_l[1][:5],"%Y-%m-%d_%H:%M")
+    #                                 x.append(q)
+    #                                 #print(k, q)
+    #                                 y_p_total.append(S_acum_1/interval)
+    #                                 y_p_total_xml.append(S_acum_2/interval)
+    #
+    #                                 for n in range(len(self.panel_plot_list)):
+    #                                     y_panel[n].append(S_p_acum[n]/interval)
+    #
+    #
+    #                                 for n in range(len(self.aeu_plot_list)):
+    #                                     y_aeu[n].append(S_aeu_acum[n]/interval)
+    #
+    #                                 for n in range(9):
+    #                                     y_nInt[n].append(S_n_acum[n]/interval)
+    #
+    #                                 for p in range(14):#para cada panel
+    #                                     for n in range(7):
+    #                                         y_nInt_panel[p][n].append(S_n_acum_panel[p][n]/interval)
+    #                                 k = 0
+    #                                 S_acum_1 = 0
+    #                                 S_acum_2 = 0
+    #                                 S_p_acum = [0]*len(self.panel_plot_list)
+    #                                 S_aeu_acum = [0]*len(self.aeu_plot_list)
+    #                                 S_n_acum = [0]*9
+    #                                 S_n_acum_panel = [[0 for x in range(7)] for n in range(14)]
+    #
+    #                         if (k != 0) and (not aeuStatus): #en caso se termine los datos sin completar el nro requerido para promediar
+    #                             x.append(datetime.datetime.strptime(_l[0]+'_'+_l[1][:5],"%Y-%m-%d_%H:%M"))
+    #
+    #                             y_p_total.append(S_acum_1/k)
+    #                             y_p_total_xml.append(S_acum_2/k)
+    #
+    #                             for n in range(len(self.panel_plot_list)):
+    #                                 y_panel[n].append(S_p_acum[n]/k)
+    #
+    #                             for n in range(len(self.aeu_plot_list)):
+    #                                 y_aeu[n].append(S_aeu_acum[n]/k)
+    #
+    #                             for n in range(9):
+    #                                 y_nInt[n].append(S_n_acum[n]/k)
+    #
+    #                             for p in range(14):#para cada panel
+    #                                 for n in range(7):
+    #                                     y_nInt_panel[p][n].append(S_n_acum_panel[p][n]/k)
+    #
+    #
+    #                         #reinicia las variables para leer otro día
+    #
+    #                         day_lines = []
+    #                         day_date = new_date
+    #                         #NO olvidar quitar la siguiente linea fuera del bucle:
+    #                         day_lines.append(line) #la primera linea del nuevo día
+    #                         flag_remnantData = False
+    #                     else:
+    #                         day_lines.append(line)  #acumulamos las listas del mismo día
+    #                         #print("->",new_date)
+    #                         pass
+    #                     valid_lines += 1
+    #
+    #                 index_line += 1
+    #
+    #
+    #         x = [n.replace(tzinfo=timezone('UTC')) - datetime.timedelta(hours=5) for n in x]   #to localTime
+    #
+    #         if return_lines_to_PD :
+    #             return day_lines
+    #
+    #         if aeuStatus:
+    #             aeu_alarms.set_index(0, inplace=True)
+    #             return aeu_alarms
+    #
+    #         return y_p_total, y_p_total_xml,y_panel,y_aeu, y_nInt,y_nInt_panel, x
+    #
+    #
+    #
+    #     else:
+    #         print("There is no data")
 
-        return_lines_to_PD = rtl2PD
-        dataType = dictDataType[dataType]
+    def readDB(self,dataType, start_plot_date,end_plot_date, aeuStatus = False,read_interval="0.5", alarmType="none"):
+
+        dataType =  decodeDataType(dataType)
         self.definePath(dataType)
-        self.show_all_panel = []  #número panel
-        self.aeu_plot_list = [] #lista de AEUs se almacenan en formato 1 a 448
-        self.panel_plot_list = []    #lista de paneles se almacenan en formato 1 a 14
-        self.aeus_plot_range = aeus_plot_range
 
         start_plot_date = start_plot_date.replace('/','-')
         end_plot_date = end_plot_date.replace('/','-')
@@ -446,7 +732,7 @@ class DB_AMISR ():
         real_end_date = None
 
         valid_interval = [0, 0.1, 0.5, 1, 2, 6, 12, 24] #el doble de lo ingresado
-        interval = float(plot_interval)  #
+        interval = float(read_interval)  #
         if not(interval in valid_interval):
             print("Invalid time interval for plot, use 0, '0.1', '0.5', '1', '2', '6', '12' or '24' hours")
             return
@@ -455,77 +741,22 @@ class DB_AMISR ():
             interval = 1
         print("data Prom: {:2d} min".format(int(interval)))
 
-        if self.DataType == 1: #solo para potencia
-            startIndex = 10
-        else:
-            startIndex = 2
 
-        datelist = []
-        csvData = []
+        startIndex = 2 # primeros 2 son hora
+
+
         day_lines = []
-        x = []
-        y_p_total = []      #potencia de la suma de todas las
-        y_p_total_xml = []
-
-        plot_pow_list = [] #lista de paneles, para mostrar intervalos de potencia
-
 
         s_date = ''
         e_date = ''
         #Cambiar los datos de las AEUS a una solo lista
         #verificar el rango
-        if not return_lines_to_PD :
-            for r,c,n in aeus_plot_list:
-                if r > 7 or r < 1:
-                    print("Invalid value to row number /aeu_list")
-                    return
-                if c > 2 or c < 1:
-                    print("Invalid value to colum number /aeu_list")
-                    return
 
-                if n > 32 or n < -1:
-                    print("Invalid value to AEU number /aeu_list")
-                    return
+        #Alarmas vacio para las 448 y el total de promedio
+        dataAlarms = pd.Series(0, index=range(448))
 
-                if n == 0:      ###plot all panel
-                    for i in range(32):
-                        self.aeu_plot_list.append(rc_to_aeu(r,c,(i+1)))
-                    self.show_all_panel.append([r,c])
-                    self.aeus_plot_range = [1,32]
-                elif n == -1:      ###plot block panel
-                    for i in range(self.aeus_plot_range[0],self.aeus_plot_range[1]+1):
-                        self.aeu_plot_list.append(rc_to_aeu(r,c,i))
-                    self.show_all_panel.append([r,c])
-                else:
-                    self.aeu_plot_list.append(rc_to_aeu(r,c,n))
-            #print(self.aeu_plot_list)
-            #cambiar y verificar la lista de entrada para
-            #graficar paneles
-            for r,c in panels_plot_list:
-                if r > 7 or r < 1:
-                    print("Invalid value to row number /panel_list")
-                    return
-                if c > 2 or c < 1:
-                    print("Invalid value to colum number /panel_list")
-                    return
-                self.panel_plot_list.append(rc_to_aeu(r,c,32)/32)
-
-
-            for r,c in plot_interval_panel_list:
-                if r > 7 or r < 1:
-                    print("Invalid value to row number /interval_panel_list")
-                    return
-                if c > 2 or c < 1:
-                    print("Invalid value to colum number /interval_panel_list")
-                    return
-                plot_pow_list.append(int(rc_to_aeu(r,c,32)/32))
-
-        y_panel = [[] for i in range(len(self.panel_plot_list))]
-        y_aeu = [[] for i in range(len(self.aeu_plot_list))]
-        y_nInt = [[] for i in range(9)] # 9 = intervals(7)+ good + bad
-        y_nInt_panel = [[[] for i in range(7)] for k in range(14)]
-        aeu_alarms = [[] for i in range(448)]
-        alarm_date = []
+        k = 0
+        i_df = 0
         if os.path.isfile(self.csvpathfile):
 
             with fileinput.input([self.csvpathfile]) as csvFile:
@@ -537,7 +768,7 @@ class DB_AMISR ():
                 s_date = datetime.datetime.strptime(s_date,"%Y-%m-%d").date()
                 e_date = datetime.datetime.strptime(e_date,"%Y-%m-%d").date() + datetime.timedelta(days=1)
                 day_date = s_date
-                flag_remnantData = False
+
 
                 index_line = 1   #  Nro de linea
                 valid_lines = 0
@@ -548,162 +779,47 @@ class DB_AMISR ():
                     line = line.split(",")
                     date = datetime.datetime.strptime(line[0]+line[1],"%Y-%m-%d%H:%M:%S")
 
-                    if fileinput.isstdin() and len(day_lines)>1 :
-                        flag_remnantData = True
-                    if (date.date() >= s_date and date.date() <= e_date) or flag_remnantData:       #Rango de fechas validos
+                    if (date.date() >= s_date and date.date() <= e_date):       #Rango de fechas validos
                         #print(index_line)
                         #-----------------------------------------------------------------------------------------
-                        if return_lines_to_PD:              #índice de línea
-                            day_lines.append(line)
-                            continue
+                        if aeuStatus : #                                solo  #ALARMA
 
-                        new_date = date.date()
-                        if new_date > day_date or fileinput.isstdin(): #hasta aquí se tiene una lista de todo 1 día
+                            listA = [int(float(n)) for n in line[startIndex:(startIndex+448)+1]]
+                            df = pd.Series(listA)
 
-                            #print(new_date)
-                            k = 0
-                            S_acum_1 = 0  #suma de AEUs
-                            S_acum_2 = 0  #potencia pico xml
-                            S_p_acum = [0]*len(self.panel_plot_list)
-                            S_aeu_acum = [0]*len(self.aeu_plot_list)
-                            S_n_acum = [0]*9
-                            S_n_acum_panel = [[0 for x in range(7)] for n in range(14)]
-                            #print("daylines", len(day_lines))
+                            df = df.where(df == decodeAlarm(alarmType))
+                            df.fillna(value=0, inplace=True)
+                            df = df.astype('int64')
 
-                            for _l in day_lines:    #todas las lineas del día
-                                k += 1
-                                if not aeuStatus:
-                                    #*********************************************************************************
-                                    if show_plot[0] == 1: # potencia total
-                                        S = sum(float(j) for j in _l[startIndex:(startIndex+448)])#Suma todas las AEUs
-                                        S_acum_1 += S
-                                        S_acum_2 += float(_l[7])
-                                    #*********************************************************************************
-                                    if show_plot[1] == 1: # potencia panel
-                                        #N_panel  del 1 al 14
-                                        m = 0
-                                        for pl in self.panel_plot_list:
-                                            init_panel = startIndex + (int(pl)-1)*32
-                                            end_panel =  startIndex + int(pl)*32
-                                            S = sum(float(j) for j in _l[init_panel:end_panel]) #suma de panel
-                                            #S = sum(float(j) for j in _l[init_panel:end_panel])/32 #promedio de panel
-                                            S_p_acum[m] += S
-                                            m += 1
-                                    #*********************************************************************************
-                                    if show_plot[2] == 1: # potencia aeu
-                                        m = 0
-                                        #print(self.aeu_plot_list)
-                                        for nAeu in self.aeu_plot_list:
-                                            #print(_l[startIndex + int(nAeu)-1])
-                                            S = float(_l[startIndex + int(nAeu)-1]) #Suma la AEUs
-                                            S_aeu_acum[m] += S
-                                            m += 1
-                                    #*********************************************************************************
-                                    if show_plot[3] == 1: # potencia stat [458]
-                                        i = 7
-                                        i_0 = 458
-                                        for l in range(14):#para cada panel
-                                            nt = _l[i_0:i_0+i] #avanza de 7 en 7
-                                            i_0 = i_0 + 7 #nuevo inicio
-                                            m = 0
-                                            for q in nt:
-                                                S = float(q)
-                                                S_n_acum_panel[l][m] += S
-                                                S_n_acum[m] += S
-                                                m += 1
-                                                M += S
-                                        S_n_acum[7] += float(_l[2])    #good
-                                        S_n_acum[8] += float(_l[4])    #bad
-                                        #print("total: ", sum(S_n_acum))
+                            dataAlarms = dataAlarms | df
+                            k += 1
+                            if k == interval:
+                                date= _l[0]+' '+_l[1][:5]
+                                k = 0
+                                aux = [date]+dataAlarms.tolist()
+                                aeu_alarms.loc[i_df] = aux
+                                dataAlarms = pd.Series(0, index=range(448)) #reinicio
+                                i_df += 1
 
-                                #*********************************************************************************
-                                ###if aeuStatus and (new_date == plot_status_day) : #para 1 solo día #ALARMA
-                                else:
-                                    i = 0
-                                    for v in _l[startIndex:(startIndex+448)+1]:  #.split(","):
-                                        #print(aeu_alarms)
-                                        aeu_alarms[i].append(v)
-                                        i += 1
-                                    alarm_date.append(datetime.datetime.strptime(_l[0]+'_'+_l[1][:5],"%Y-%m-%d_%H:%M"))
-                                    continue
-                                #*********************************************************************************
-                                #*********************************************************************************
-                                #*********************************************************************************
-                                #******************************* WRITE AND RESET**********************************
-                                if k == interval and (not aeuStatus):
-                                    #********act Pot total
-                                    q =datetime.datetime.strptime(_l[0]+'_'+_l[1][:5],"%Y-%m-%d_%H:%M")
-                                    x.append(q)
-                                    #print(k, q)
-                                    y_p_total.append(S_acum_1/interval)
-                                    y_p_total_xml.append(S_acum_2/interval)
-
-                                    for n in range(len(self.panel_plot_list)):
-                                        y_panel[n].append(S_p_acum[n]/interval)
-
-
-                                    for n in range(len(self.aeu_plot_list)):
-                                        y_aeu[n].append(S_aeu_acum[n]/interval)
-
-                                    for n in range(9):
-                                        y_nInt[n].append(S_n_acum[n]/interval)
-
-                                    for p in range(14):#para cada panel
-                                        for n in range(7):
-                                            y_nInt_panel[p][n].append(S_n_acum_panel[p][n]/interval)
-                                    k = 0
-                                    S_acum_1 = 0
-                                    S_acum_2 = 0
-                                    S_p_acum = [0]*len(self.panel_plot_list)
-                                    S_aeu_acum = [0]*len(self.aeu_plot_list)
-                                    S_n_acum = [0]*9
-                                    S_n_acum_panel = [[0 for x in range(7)] for n in range(14)]
-
-                            if (k != 0) and (not aeuStatus): #en caso se termine los datos sin completar el nro requerido para promediar
-                                x.append(datetime.datetime.strptime(_l[0]+'_'+_l[1][:5],"%Y-%m-%d_%H:%M"))
-
-                                y_p_total.append(S_acum_1/k)
-                                y_p_total_xml.append(S_acum_2/k)
-
-                                for n in range(len(self.panel_plot_list)):
-                                    y_panel[n].append(S_p_acum[n]/k)
-
-                                for n in range(len(self.aeu_plot_list)):
-                                    y_aeu[n].append(S_aeu_acum[n]/k)
-
-                                for n in range(9):
-                                    y_nInt[n].append(S_n_acum[n]/k)
-
-                                for p in range(14):#para cada panel
-                                    for n in range(7):
-                                        y_nInt_panel[p][n].append(S_n_acum_panel[p][n]/k)
-
-
-                            #reinicia las variables para leer otro día
-
-                            day_lines = []
-                            day_date = new_date
-                            #NO olvidar quitar la siguiente linea fuera del bucle:
-                            day_lines.append(line) #la primera linea del nuevo día
-                            flag_remnantData = False
                         else:
-                            day_lines.append(line)  #acumulamos las listas del mismo día
-                            #print("->",new_date)
-                            pass
+                            day_lines.append(line)
+
+                        #*********************************************************************************
+
                         valid_lines += 1
 
                     index_line += 1
 
+            if aeuStatus:
+                aeu_alarms.set_index(0, inplace=True)
+                return aeu_alarms
 
-            x = [n.replace(tzinfo=timezone('UTC')) - datetime.timedelta(hours=5) for n in x]   #to localTime
+            else:
 
-            if return_lines_to_PD :
                 return day_lines
 
-            if aeuStatus:
-                return aeu_alarms,alarm_date
 
-            return y_p_total, y_p_total_xml,y_panel,y_aeu, y_nInt,y_nInt_panel, x
+
 
 
 

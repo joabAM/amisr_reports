@@ -15,7 +15,7 @@ class PDF(FPDF, HTMLMixin):
 
 
 fig_type={
-"stats":0, "correlation":1, "pie": 2, "general":3
+"stats":0, "correlation":1, "pie": 2, "alarm":3,"general":4
 }
 table_type={
 "aeu_list":0,"aeu_reps":1
@@ -60,7 +60,12 @@ to create high resolution time images of the phenomenon to be studied.
 The antenna array has been oriented North-South to obtain a greater pointing width
 in the East-West direction.\n The following graphs show the performance of the radar since
 {} to {}</p>"""
-
+text_alarm_one="""<font size=12></p>The following graph shows the VSWR alarms produced during
+the operation of AMISR in the selected period; the VSWR alarm maight have been asociated to the failure
+in the AMISR Antenna Element Units (AEU), since during the event in november 2020, the radar
+showed multiple alarms simultaneously in all panels.
+</p>
+"""
 class Report():
 
     pdf = None
@@ -76,8 +81,8 @@ class Report():
         self.pdf    =   PDF('P', 'mm', 'A4')
         self.start_date =   start
         self.end_date   =   end
-        self.datetime_start = datetime.datetime.strptime(start,"%Y-%m-%d")
-        self.datetime_end = datetime.datetime.strptime(end,"%Y-%m-%d")
+        self.datetime_start = start
+        self.datetime_end = end
 
         self.pdf.set_font("Times", size=38)
         self.pdf.add_page()
@@ -116,6 +121,9 @@ class Report():
             pass
         elif type == 2:
             self.add_pie(figure, values)
+            pass
+        elif type == 3:
+            self.add_alarm(figure, values)
             pass
         else:
             self.add_general(figure)
@@ -213,6 +221,19 @@ failed  {} ({:.1f}%) AEU depending of the failure in November 20.</p>""".format(
 is taken into account, this varies with the power that the radar observes. This can be seen in the
 following graph, where the blue line is the one obtained by adding all the AEUs.</p>"""
         self.pdf.write_html(text)
+
+    def add_alarm(self,figure, values):
+        self.pdf.add_page()
+        self.pdf.set_font("Times", "B", size=18)
+        text = "VSWR Alarms"
+        self.pdf.cell(10, 10, text, ln=1, align='L')
+
+        self.pdf.write_html(text_alarm_one)
+
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=20, y=self.pdf.eph/3, h=self.pdf.eph/2, w=self.pdf.epw)
+
 
     def getReport(self):
         self.pdf.output("pdf-amisr-report.pdf")

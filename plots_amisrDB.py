@@ -11,12 +11,9 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as plticker
 from matplotlib.ticker import FuncFormatter
+import numpy as np
 
-
-dictDataType = {"power":1, "current":2, "alarms":3, "temperature":4,
-                "SSPA volts":5, "volts dir":6, "volts rev":7,
-                "-8 volts":8
-                }
+from utils import *
 
 class Plot_amisrDB():
 
@@ -34,7 +31,7 @@ class Plot_amisrDB():
     aeus_plot_range = []
 
     def __init__(self,DataType,panel_average=False,aeus_plot_list=None, show_plot_bar = False):
-        dataType = dictDataType[DataType]
+        dataType = decodeDataType(DataType)
         self.DataType = dataType
         self.show_plot_bar = show_plot_bar
         self.panel_average = panel_average
@@ -54,6 +51,7 @@ class Plot_amisrDB():
             self.YmaxAEU = 5
         elif dataType == 3:
             TitleLabel = "Alarms"
+            return
         elif dataType == 4:
             if temperatureType == 1:#temp SSPAs
                 TitleLabel = "Temperature SSPA"
@@ -350,37 +348,6 @@ class Plot_amisrDB():
         ## para cada valor de alarma se asigna un colorbar
         ## 0= OK, 1 = TEMP, 2= VSWR, 3 = SUMMARY ()
 
-
-    def getPlotsAlarms(self,aeu_alarms,alarm_date,maxAEU,minAEU):
-
-        #print(alarm_date)
-        alarm_date = [n.replace(tzinfo=timezone('UTC'))- datetime.timedelta(hours=5) for n in alarm_date]   #to localTime
-        alarm_date_label = [n.strftime("%Y/%m/%d, %H:%M:%S") for n in alarm_date]
-
-        minAEU = status_range[0]
-        maxAEU = status_range[1]
-        aeuRange = maxAEU - minAEU
-        aeu_alarms = aeu_alarms[minAEU-1:maxAEU][:]
-        data_status = np.zeros((len(aeu_alarms),len(aeu_alarms[0])))
-
-        n = 0
-        for k in aeu_alarms:
-            data_status[n] = np.array(k)
-            n += 1
-
-        fig_s, ax = plt.subplots()
-        img = ax.imshow(data_status,aspect='auto', interpolation='none', cmap='jet',vmin=0, vmax=3)
-
-        cbar = fig_s.colorbar(img, ticks=[0, 1, 2, 3])
-        cbar.ax.set_yticklabels(['OK', 'TEMP', 'VSWR','SUMM'])  # vertically oriented colorbar
-
-        ylabel_aeu = ["R0%d-C%d %02d"%(aeu_to_rc(n)) for n in range(status_range[0],status_range[1]+1)]
-        plt.xticks(np.arange(1,len(aeu_alarms[0])+1, dtype=np.int),alarm_date_label,rotation=30)
-        plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int),ylabel_aeu)
-        plt.autoscale(enable=True, axis='x', tight=False)
-
-        fig_s.canvas.draw()
-        return fig_s
 
 
 

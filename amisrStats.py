@@ -9,12 +9,10 @@ from pandas.plotting import table
 import math
 import matplotlib
 import matplotlib.pyplot as plt
-from scipy import signal
+import matplotlib.ticker as plticker
 
-dictDataType = {"power":1, "current":2, "alarms":3, "temperature":4,
-                "SSPA volts":5, "volts dir":6, "volts rev":7,
-                "-8 volts":8
-                }
+from scipy import signal
+from utils import *
 
 SMALL_SIZE = 16
 MEDIUM_SIZE = 18
@@ -32,11 +30,14 @@ class STATS_AMISR():
     table_status_list = None
     startdate = None
     enddate = None
-    
-    def __init__(self,type, data, navg=1):
-        self.data = pd.DataFrame(data, dtype='int32')
 
-        dataType = dictDataType[type]
+
+    def __init__(self,type="power", data=None, navg=1):
+        if data == None:
+            return
+        self.data = pd.DataFrame(data, dtype='int32')
+        dataType = decodeDataType(type)
+
         self.work_path = os.getcwd()
         if dataType == 1:
             self.labels = pd.read_csv(self.work_path+"/labels-power.csv")
@@ -48,12 +49,13 @@ class STATS_AMISR():
         self.data.columns = self.labels.columns #etiquetas para cada columna
         aux = self.data.iloc[:,0:2].astype(str) #date and time
         self.data = self.data.apply(pd.to_numeric, errors='coerce')
-        self.data.iloc[:,0:2] = aux #regresa hora y fecha
+        date_time = aux.date +" "+aux.time
+        self.data.iloc[:,0] = pd.to_datetime(date_time,format="%Y-%m-%d %H:%M:%S") #regresa hora y fecha
         self.nAvg = navg
         self.rMant = pd.read_csv(self.work_path+"/Registro_matenimiento.csv")
-        self.startdate = self.data.iloc[0,0]
-        self.enddate = self.data.iloc[-1,0]
-
+        self.startdate = self.data.iloc[0,0].date()
+        self.enddate = self.data.iloc[-1,0].date()
+        #print(self.data.dtypes)
 
 
     def setCustomStylePlot(self):
@@ -232,7 +234,7 @@ class STATS_AMISR():
             title="Power Tx {} watts".format(df_plt.index[0][6:])
             a = np.linspace(1,14,num=14)
             xlabel =[str(int(i)) for i in a]
-
+            hours = len(df)/60 # -> min to hours
             label_watts = df_plt.index
             df_filt = self.data_npow[label_watts[0][6:]]
 
@@ -240,8 +242,10 @@ class STATS_AMISR():
             df_plt = df_plt.apply(np.ceil)
             df_plt.plot.bar(ax=axes[r,0], grid=True,stacked=True,title=title)
 
-            title="{} watts over hours".format(label_watts[0][6:])
+            title="{} watts over TX/RX minutes".format(label_watts[0][6:])
             df_filt.plot(x='hours', y=label_watts[0][6:],ax=axes[r,1],grid=True,title=title)
+            #ax = axes[r,1]
+            #ax.set_xticks(ax.get_xticks()/60)
             fig.canvas.draw()
         if show :
             plt.show()
@@ -351,6 +355,169 @@ class STATS_AMISR():
         fig.canvas.draw()
 
         return fig, int(self.total_power_end)
+
+    def getPlotTotal(self, DataType="power", interval=30):
+        dataType = decodeDataType(DataType)
+        if dataType == 1:
+            self.TitleLabel = "Power"
+            self.unitLabel = "kW"
+            self.YmaxT = 235.2
+            self.YmaxP = 16.8
+            self.YmaxAEU = 750
+        elif dataType == 2:
+            self.TitleLabel = "Current"
+            self.unitLabel = "A"
+            self.YmaxT = 1500
+            self.YmaxP = 150
+            self.YmaxAEU = 5
+
+        else :
+            print("ERROR, no Power or Current plot select")
+            return
+        self.titles = ["AMISR Total "+self.TitleLabel, "Panel "+self.TitleLabel, "AEU "+self.TitleLabel, "AEUs / Power Intervals", "Panel Average "+self.TitleLabel]
+
+        fig, ax = plt.subplots()
+        fig.set_size_inches(10, 7)
+        ax_2 = ax.twinx()
+        resample = "{}T".format(interval)
+        power_data = self.data.set_index(pd.DatetimeIndex(self.data.date))
+        power_data= power_data.resample(resample).mean()
+        power_data.peak = power_data.peak/1000
+        power_data["t_PowerAEU"] = power_data.iloc[:,10:458].sum(axis=1)
+        power_data["t_PowerAEU"] = power_data["t_PowerAEU"]/1000
+        #print(power_data["t_PowerAEU"] )
+        power_data["t_PowerAEU"] = power_data["t_PowerAEU"].where(power_data["t_PowerAEU"]>100.0,np.nan)
+        #print(power_data["t_PowerAEU"] )
+
+        plt_p_a = power_data.peak.dropna()
+        plt_p_b = power_data.t_PowerAEU.dropna()
+        ax.set_ylabel(self.TitleLabel+' ('+self.unitLabel+')')
+        #
+        ax_2.set_ylabel('percent (%)')
+
+        ax.set_ylim(100, self.YmaxT) #igual a 105%
+        minPerC = (100/self.YmaxT)*105
+        ax_2.set_ylim(minPerC, 105)
+
+        plt.title(self.titles[0], fontsize=16)
+        plt_p_a.plot(ax=ax,  color='tab:orange', label="Peak Power (xml)")
+        plt_p_b.plot(ax=ax,  color='b', label="Total Power (AEU)")
+        ax.minorticks_on()
+        ax.grid(which='minor', linestyle=':', linewidth='0.5', color='black')
+        ax.legend(bbox_to_anchor=(1,1), loc="upper right", fontsize = "x-small", title = "legend")
+
+
+        plt.tight_layout()
+        fig.canvas.draw()
+        plt.show()
+        return fig
+
+
+    def getPlotPanels(self, DataType="power", panels_list=None, interval=30, avg=False):
+        if panels_list ==None:
+            panels_plot_list = [[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],
+            [1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2]]
+        else:
+            panels_plot_list = panels_list
+
+        panel_label_list = ["R0"+str(k[0])+"-C"+str(k[1])  for k in panels_plot_list]
+
+        fig, ax = plt.subplots()
+        ax2 = ax.twinx()
+
+
+
+        panel_plot_list = []
+        y_panel = pd.DataFrame(0, index=self.data.index, columns=panel_label_list)
+
+        for r,c in panels_plot_list:
+            if r > 7 or r < 1:
+                print("Invalid value to row number /panel_list")
+                return
+            if c > 2 or c < 1:
+                print("Invalid value to colum number /panel_list")
+                return
+            panel_plot_list.append(rc_to_aeu(r,c,32)/32)
+
+        #N_panel  del 1 al 14
+        m = 0
+
+        for pl in panel_plot_list:
+            init_panel = startIndex + (int(pl)-1)*32
+            end_panel =  startIndex + int(pl)*32
+
+            y_panel[panel_label_list[m]] = self.data.iloc[:,init_panel:end_panel].sum()
+            if avg:
+                y_panel[panel_label_list[m]] /= 32
+            m += 1
+            #combianr bucles
+        l = 0
+        for col in panel_plot_list:
+            if  self.DataType==1 :
+                y_k = [k/ 1000 for k in y]     # kilo Watts
+            else:
+                y_k = y
+            if plot_format == '1':
+                ax.plot_date(x,y_k,fmt = '',linestyle='-',label = panel_label_list[l])
+            elif plot_format == '2':
+                ax.plot(y_k,label = panel_label_list[l])
+            else:
+                print("Error, plot_format invalid value...")
+            l += 1
+        if  self.DataType==1 :
+            ax2.set_ylabel('percent (%)')
+            ax2.set_ylim(0,105)
+            ax.axhline(y=16, color='r', linestyle='--',label = 'ideal')
+        plt.gca().format_coord = fmt
+        ax.set_xlabel('dates')
+        ax.set_ylabel(self.TitleLabel+'('+self.unitLabel+')')
+        minY = min(min(y_panel))/1000 - 1
+        ax.set_ylim(minY, self.YmaxP)# 16.8 = 105%
+        #print(minY, self.YmaxP)
+        ax.legend(bbox_to_anchor=(-0.06,1), loc="upper right", fontsize = "x-small", title = "legend")
+        ax.grid()
+        ax.grid(which='minor', linestyle=':', linewidth='0.5', color='black')
+        plt.title(self.titles[1], fontsize=16)
+        plt.setp(ax.get_xticklabels(), rotation=30, ha='right')
+        plt.tight_layout()
+        fig.canvas.draw()
+        figureList.append(fig)
+
+        return None
+
+
+
+    def getPlotsAlarms(self,aeu_alarms,type="VSWR",minAEU=1,maxAEU=448):
+
+        data = aeu_alarms
+        data.index = [ datetime.datetime.strptime(x,"%Y-%m-%d %H:%M")- datetime.timedelta(hours=5) for x in data.index]
+
+        minAEU = minAEU
+        maxAEU = maxAEU
+        data_status = data.iloc[:,minAEU-1:maxAEU].to_numpy(dtype='float32')
+        data_status = np.transpose(data_status)
+        fig_s, ax = plt.subplots()
+        fig_s.set_size_inches(20, 8)
+        img = ax.imshow(data_status,aspect='auto', interpolation='none', cmap='YlGnBu_r',vmin=0, vmax=1)
+
+        cbar = fig_s.colorbar(img, ticks=[0, 1])
+        cbar.ax.set_yticklabels(['OK', type])  # vertically oriented colorbar
+        ylabel_aeu = ["R0%d-C%d %02d"%(aeu_to_rc(n)) for n in range(minAEU,maxAEU+1)]
+        plt.xticks(np.arange(1,len(data)+1, dtype=np.int),data.index,rotation=30)
+        plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int),ylabel_aeu)
+        #plt.xticks(np.arange(1,len(data)+1, dtype=np.int))
+        #plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int))
+        ax.xaxis.set_major_locator(plt.MaxNLocator(40))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(30))
+
+        plt.autoscale(enable=True, axis='x', tight=False)
+
+        plt.tight_layout()
+        fig_s.canvas.draw()
+        return fig_s
+
+    def show(self):
+        plt.show()
 
     def getPanelDistribution(self):
         pass
