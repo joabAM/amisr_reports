@@ -41,8 +41,10 @@ class STATS_AMISR():
         self.work_path = os.getcwd()
         if dataType == 1:
             self.labels = pd.read_csv(self.work_path+"/labels-power.csv")
+            self.start_idx = 10
         elif dataType ==2:
             print("tipo 2")
+            self.start_idx = 2
         else:
             print("ninguno")
 
@@ -320,22 +322,35 @@ class STATS_AMISR():
         #print("Rate: ", rate)
         return fig, rate
 
-    def getOverview(self):
+    def getOverview(self, panel=None):
         start = 'Start ({})'.format(self.startdate)
         end = 'End ({})'.format(self.enddate)
         columns=[start, end]
+        if panel == None:
+            status_table = self.table_status_list
+        else:
+            init = (panel-1)*32
+            end = init + 32
+            status_table = self.table_status_list.iloc[init:end,:]
         index=pd.Index(['Power (Kw)', 'Tx','no Tx','hours','no Tx and Rep','no Tx no Rep','new damaged','rate (hours/AEU)'])
+        Tx     =   status_table[status_table.Tx== True]
+        noTx   =   status_table[status_table.Tx== False]
+        noTxnoRep  =   noTx[(noTx.fail_Nov == 0 )  & (noTx.rep_bef_nov == 0 ) & (noTx.rep_aft_nov == 0 ) ]
+        noTxRep    =   noTx[(noTx.fail_Nov == 1 ) | (noTx.rep_bef_nov == 1 ) | (noTx.rep_aft_nov == 1 )  ]
+        noTxFnov   =   noTx[noTx.fail_Nov == 1 ]
+        noTxnoFnov =   noTx[noTx.fail_Nov == 0 ]
+
 
         tb_over = pd.DataFrame(columns=columns, index=index)
-        tb_over.loc['Power (Kw)',start]    =   int(self.total_power_start)
-        tb_over.loc['Power (Kw)',end]    =   int(self.total_power_end)
-        tb_over.loc['Tx',start]    =   len(self.table_status_list[self.table_status_list["start Tx"]== True])
-        tb_over.loc['Tx',end]   =     len(self.Tx)
-        tb_over.loc['no Tx',start]  =   len(self.table_status_list[self.table_status_list["start Tx"]== False])
-        tb_over.loc['no Tx',end]    =   len(self.noTx)
+        tb_over.loc['Power (Kw)',start]    =   int(status_table["start Watts"].sum()/1000)
+        tb_over.loc['Power (Kw)',end]    =   int(status_table["end Watts"].sum()/1000)
+        tb_over.loc['Tx',start]    =   len(status_table[status_table["start Tx"]== True])
+        tb_over.loc['Tx',end]   =     len(Tx)
+        tb_over.loc['no Tx',start]  =   len(status_table[status_table["start Tx"]== False])
+        tb_over.loc['no Tx',end]    =   len(noTx)
         tb_over.loc['hours',end]    =   int(self.hours)
-        tb_over.loc['no Tx and Rep',end]    =   len(self.noTxRep)
-        tb_over.loc['no Tx no Rep',end]    =   len(self.noTxnoRep)
+        tb_over.loc['no Tx and Rep',end]    =   len(noTxRep)
+        tb_over.loc['no Tx no Rep',end]    =   len(noTxnoRep)
         tb_over.loc['new damaged',end]    =   tb_over.loc['no Tx',end]  - tb_over.loc['no Tx',start]
         tb_over.loc['rate (hours/AEU)',end]    =   int(self.rate)
 
@@ -358,62 +373,72 @@ class STATS_AMISR():
 
     def getPlotTotal(self, DataType="power", interval=30):
         dataType = decodeDataType(DataType)
+        Ymin = 0
+        start_idx = 0
+        end_idx = 0
         if dataType == 1:
             self.TitleLabel = "Power"
             self.unitLabel = "kW"
             self.YmaxT = 235.2
             self.YmaxP = 16.8
             self.YmaxAEU = 750
+            Ymin = 100
         elif dataType == 2:
             self.TitleLabel = "Current"
             self.unitLabel = "A"
             self.YmaxT = 1500
             self.YmaxP = 150
             self.YmaxAEU = 5
+            Ymin = 100
 
         else :
             print("ERROR, no Power or Current plot select")
             return
         self.titles = ["AMISR Total "+self.TitleLabel, "Panel "+self.TitleLabel, "AEU "+self.TitleLabel, "AEUs / Power Intervals", "Panel Average "+self.TitleLabel]
-
+        end_idx = self.start_idx +448
         fig, ax = plt.subplots()
         fig.set_size_inches(10, 7)
         ax_2 = ax.twinx()
         resample = "{}T".format(interval)
-        power_data = self.data.set_index(pd.DatetimeIndex(self.data.date))
-        power_data= power_data.resample(resample).mean()
-        power_data.peak = power_data.peak/1000
-        power_data["t_PowerAEU"] = power_data.iloc[:,10:458].sum(axis=1)
-        power_data["t_PowerAEU"] = power_data["t_PowerAEU"]/1000
-        #print(power_data["t_PowerAEU"] )
-        power_data["t_PowerAEU"] = power_data["t_PowerAEU"].where(power_data["t_PowerAEU"]>100.0,np.nan)
-        #print(power_data["t_PowerAEU"] )
+        total_SUMaeu = self.data.set_index(pd.DatetimeIndex(self.data.date))
+        total_SUMaeu= total_SUMaeu.resample(resample).mean()
 
-        plt_p_a = power_data.peak.dropna()
-        plt_p_b = power_data.t_PowerAEU.dropna()
+        total_SUMaeu["total_amisr"] = total_SUMaeu.iloc[:,10:458].sum(axis=1)
+        total_SUMaeu["total_amisr"] = total_SUMaeu["total_amisr"]/1000
+        #print(total_SUMaeu["total_amisr"] )
+        total_SUMaeu["total_amisr"] = total_SUMaeu["total_amisr"].where(total_SUMaeu["total_amisr"]>100.0,np.nan)
+        #print(total_SUMaeu["total_amisr"] )
+
+
+        plt_p_b = total_SUMaeu.total_amisr.dropna()
         ax.set_ylabel(self.TitleLabel+' ('+self.unitLabel+')')
         #
         ax_2.set_ylabel('percent (%)')
 
-        ax.set_ylim(100, self.YmaxT) #igual a 105%
-        minPerC = (100/self.YmaxT)*105
+        ax.set_ylim(Ymin, self.YmaxT) #igual a 105%
+        minPerC = (Ymin/self.YmaxT)*105
         ax_2.set_ylim(minPerC, 105)
 
         plt.title(self.titles[0], fontsize=16)
-        plt_p_a.plot(ax=ax,  color='tab:orange', label="Peak Power (xml)")
-        plt_p_b.plot(ax=ax,  color='b', label="Total Power (AEU)")
+
+        if dataType == 1:
+            total_SUMaeu.peak = total_SUMaeu.peak/1000
+            plt_p_a = total_SUMaeu.peak.dropna()
+            plt_p_a.plot(ax=ax,  color='tab:orange', label="Peak Power (xml)")
+
+        plt_p_b.plot(ax=ax,  color='b', label="Total (all AEU)")
         ax.minorticks_on()
         ax.grid(which='minor', linestyle=':', linewidth='0.5', color='black')
         ax.legend(bbox_to_anchor=(1,1), loc="upper right", fontsize = "x-small", title = "legend")
 
-
         plt.tight_layout()
         fig.canvas.draw()
-        plt.show()
+
         return fig
 
 
-    def getPlotPanels(self, DataType="power", panels_list=None, interval=30, avg=False):
+    def getPlotPanels(self, DataType="power", panels_list=None, interval=30):
+        panels_plot_list = []
         if panels_list ==None:
             panels_plot_list = [[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],
             [1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2]]
@@ -422,68 +447,81 @@ class STATS_AMISR():
 
         panel_label_list = ["R0"+str(k[0])+"-C"+str(k[1])  for k in panels_plot_list]
 
-        fig, ax = plt.subplots()
-        ax2 = ax.twinx()
+        figures = []
+
+        panels_number = [rc_to_panel(x[0],x[1]) for x in panels_plot_list]
+
+        for panel in panels_number:
+            fig1 = self.plotAEU(panel, avg=interval,sum=True) #panel
+            fig2 = self.plotAEU(panel, avg=interval) #AEUs
+            figures.append([fig1,fig2])
+
+        return figures, panel_label_list
 
 
 
-        panel_plot_list = []
-        y_panel = pd.DataFrame(0, index=self.data.index, columns=panel_label_list)
+    def plotAEU(self, panel_nro, plot_list=None, plot_range=None, avg=30,sum=False):
+        '''
+        panel nro = 1 al 14
+        plot_list = 1 al 32, solo lo indicado en la lista
+        plot_range = 1 al 32, abarca todo el rango
+        avg = promedio en minutos
+        sum = si suma todas las Aeu(x panel) o grafica todas independientes
+        '''
+        panel = panel_nro
+        aeu_label_list = []
+        aeus_plot_list = []
+        aeus_plot_range = []
+        r, c = panel_to_rc(panel_nro)
+        if plot_list == None :
+            if plot_range==None:
+                aeus_plot_range = [1,32]
+            for i in range(aeus_plot_range[0],aeus_plot_range[1]+1):
+                aeus_plot_list.append(rc_to_aeu(r,c,i))
+                aeu_label_list.append("R0"+str(r)+"-C"+str(c)+" #"+str(i))
+        else:
+            for k in aeus_plot_list:
+                aeus_plot_list.append(rc_to_aeu(r,c,k))
+                aeu_label_list.append("R0"+str(r)+"-C"+str(c)+" #"+str(k))
 
-        for r,c in panels_plot_list:
-            if r > 7 or r < 1:
-                print("Invalid value to row number /panel_list")
-                return
-            if c > 2 or c < 1:
-                print("Invalid value to colum number /panel_list")
-                return
-            panel_plot_list.append(rc_to_aeu(r,c,32)/32)
 
-        #N_panel  del 1 al 14
-        m = 0
+        fig,ax =  plt.subplots()
+        fig.set_size_inches(10, 7)
+        '''
+        y_aeu -> [time_prom][panel]
+        '''
+        start_ind = (panel_nro - 1)* 32 + self.start_idx
 
-        for pl in panel_plot_list:
-            init_panel = startIndex + (int(pl)-1)*32
-            end_panel =  startIndex + int(pl)*32
+        y_aeus = self.data.iloc[:,start_ind:(start_ind+32)]
+        y_aeus.set_index(pd.DatetimeIndex(self.data.date), inplace=True)
+        resample = "{}T".format(avg)
+        y_aeus= y_aeus.resample(resample).mean()
+        #print(y_aeus)
+        if sum:
+            y_aeus = y_aeus.mean(axis=1)
+            y_aeus.plot(ax=ax, label="power")
+            ax.legend(bbox_to_anchor=(-0.06,1), loc="right", fontsize = "x-small", title = "legend")
+        else:
+            y_aeus.columns = aeu_label_list
+            for y in y_aeus.columns:
+                y_aeus[y].plot(ax=ax,label=y)
+                ax.legend(bbox_to_anchor=(-0.06,1), loc="upper right", fontsize = "x-small", title = "legend")
 
-            y_panel[panel_label_list[m]] = self.data.iloc[:,init_panel:end_panel].sum()
-            if avg:
-                y_panel[panel_label_list[m]] /= 32
-            m += 1
-            #combianr bucles
-        l = 0
-        for col in panel_plot_list:
-            if  self.DataType==1 :
-                y_k = [k/ 1000 for k in y]     # kilo Watts
-            else:
-                y_k = y
-            if plot_format == '1':
-                ax.plot_date(x,y_k,fmt = '',linestyle='-',label = panel_label_list[l])
-            elif plot_format == '2':
-                ax.plot(y_k,label = panel_label_list[l])
-            else:
-                print("Error, plot_format invalid value...")
-            l += 1
-        if  self.DataType==1 :
-            ax2.set_ylabel('percent (%)')
-            ax2.set_ylim(0,105)
-            ax.axhline(y=16, color='r', linestyle='--',label = 'ideal')
-        plt.gca().format_coord = fmt
         ax.set_xlabel('dates')
-        ax.set_ylabel(self.TitleLabel+'('+self.unitLabel+')')
-        minY = min(min(y_panel))/1000 - 1
-        ax.set_ylim(minY, self.YmaxP)# 16.8 = 105%
-        #print(minY, self.YmaxP)
-        ax.legend(bbox_to_anchor=(-0.06,1), loc="upper right", fontsize = "x-small", title = "legend")
-        ax.grid()
-        ax.grid(which='minor', linestyle=':', linewidth='0.5', color='black')
-        plt.title(self.titles[1], fontsize=16)
-        plt.setp(ax.get_xticklabels(), rotation=30, ha='right')
-        plt.tight_layout()
-        fig.canvas.draw()
-        figureList.append(fig)
 
-        return None
+
+        plt.title("Panel R0{}-C{}".format(r,c), fontsize=16)
+
+        plt.setp(ax.get_xticklabels(), rotation=45)
+        plt.autoscale(enable=True, axis='x', tight=False)
+        plt.tight_layout()
+        ###ax.minorticks_on()->quita las fechas
+        ax.grid()
+        plt.grid(which='minor', color='#444444', linestyle='-', alpha=0.2)
+
+        fig.canvas.draw()
+        plt.show()
+        return fig
 
 
 
@@ -505,8 +543,7 @@ class STATS_AMISR():
         ylabel_aeu = ["R0%d-C%d %02d"%(aeu_to_rc(n)) for n in range(minAEU,maxAEU+1)]
         plt.xticks(np.arange(1,len(data)+1, dtype=np.int),data.index,rotation=30)
         plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int),ylabel_aeu)
-        #plt.xticks(np.arange(1,len(data)+1, dtype=np.int))
-        #plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int))
+
         ax.xaxis.set_major_locator(plt.MaxNLocator(40))
         ax.yaxis.set_major_locator(plt.MaxNLocator(30))
 

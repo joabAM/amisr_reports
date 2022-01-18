@@ -8,8 +8,8 @@ import os
 
 
 online = 0 # True or False 1 o 0
-startdate = '2021/12/01'  #formato yyyy/mm/dd para offline
-enddate = '2021/12/16'   #para offline
+startdate = '2021/08/15'  #formato yyyy/mm/dd para offline
+enddate = '2021/12/15'   #para offline
 hostname = '127.0.0.1 '
 username = 'soporte'
 password = 'soporte'
@@ -87,15 +87,16 @@ def main():
     stats.updateStatusTable()#necesario para los valores del pie, y las tablas
 
     #fig_alarm = stats.getPlotsAlarms(DataAlarm)
-    power_figure = stats.getPlotTotal("power",interval=60)
+    #power_figure = stats.getPlotTotal("power",interval=60)
     #
+    #f,list = stats.getPlotPanels()
     # fig_stats = stats.getStatsTx()
     # fig_xcorr = stats.getCrossCorrelation()
     # figs_pie, values_pie = stats.getPieRep()
     # fig_rate, rate = stats.getRateFig("cero")
-    # table_over, total_pow = stats.getOverview() #ejecutar getRateFig() antes
+    table_over, total_pow = stats.getOverview() #ejecutar getRateFig() antes
 
-    #stats.show()
+    stats.show()
 
     #
     # report.add_overview(table_over, total_pow, power_figure[0])

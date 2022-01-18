@@ -1,5 +1,5 @@
 
-
+import numpy as np
 
 
 def decodeDataType(dataTypeStr):
@@ -45,3 +45,34 @@ def aeu_to_rc(aeu):
         n = 32
         row -= 1
     return row, col, n
+
+def aeu_to_panel(aeu):
+    row, col, n = aeu_to_rc(aeu)
+    panel = rc_to_panel(row, col)
+    return panel, n
+
+def rc_to_panel(row, col):
+    panel = (col-1)*7 + row
+    return panel
+
+def panel_to_rc(panel):
+    col = 0
+    row = 0
+    if panel > 14 or panel< 1:
+        print("error invalid panel number")
+        return
+    if panel>7:
+        row = panel-7
+        col = 2
+    else:
+        row = panel
+        col = 1
+    return row, col
+
+def getRate(serie,order):
+    data = serie.reset_index()
+    poly = np.poly1d(np.polyfit(data.index, data.values, order))
+    vel = poly.deriv()  #velocidad
+    med = len(data.index)/2 #valor medio
+    rate = vel(med)
+    return rate, futrate
