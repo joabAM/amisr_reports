@@ -1,6 +1,6 @@
-
+from scipy.optimize import curve_fit
 import numpy as np
-
+import math
 
 def decodeDataType(dataTypeStr):
     dictDataType = {"power":1, "current":2, "alarm":3, "temperature":4,
@@ -69,10 +69,36 @@ def panel_to_rc(panel):
         col = 1
     return row, col
 
-def getRate(serie,order):
-    data = serie.reset_index()
-    poly = np.poly1d(np.polyfit(data.index, data.values, order))
-    vel = poly.deriv()  #velocidad
-    med = len(data.index)/2 #valor medio
-    rate = vel(med)
-    return rate, futrate
+
+def parabolic(x, a, c):
+	return a*np.sqrt(x) + c
+
+def parabolic_dev(x,a,c):
+    return (a/2)*(1/np.sqrt(x))
+
+def get_rate(serie, func="parabolic", order=1):
+    """
+    func-> "parabolic", "polynomial"
+    """
+    data = serie
+    med = len(data.index)/(2*60) #valor medio hrs
+    y = data.values
+    x = data.index 
+    if func == "polynomial":
+        pol = np.polyfit(x, y, order)
+        poly = np.poly1d(pol)
+        data_fit = poly(x)
+        vel = poly.deriv()  #velocidad
+        rate = vel(med)
+    else:
+        f = eval(func)
+        popt, pcov = curve_fit(f, x, y)
+        data_fit = f(x,*popt)
+        rate = (f(med,*popt) - f((med-1),*popt))
+    
+    #AEU/min
+    r = rate* 60        # AEU/hrs
+    #print(r)
+    r = 1/r             # hrs/AEU
+    r = int(r*10)
+    return (data_fit), r/10

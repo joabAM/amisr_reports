@@ -8,7 +8,7 @@ import os
 
 
 online = 0 # True or False 1 o 0
-startdate = '2021/08/15'  #formato yyyy/mm/dd para offline
+startdate = '2021/12/01'  #formato yyyy/mm/dd para offline
 enddate = '2021/12/15'   #para offline
 hostname = '127.0.0.1 '
 username = 'soporte'
@@ -64,13 +64,11 @@ def main():
     #
 
     #lectura de ALARMA, solo vswr, retorna data y date
-    # DataAlarm = dbObj.readDB("alarm",startdate,enddate,rtl2PD=False,show_plot=show_plot,
-    #         aeuStatus=True, plot_interval=2, alarmType="vswr")
+
+    DataAlarm = dbObj.readDB("alarm",startdate,enddate,read_interval="6" ,alarmType="vswr")
 
     stats = STATS_AMISR(type="power", data=DataDB )
     #stats = STATS_AMISR()#contructor vacio, prueba de alarmas
-    # plotObj1 = Plot_amisrDB("power",panel_average=panel_average,aeus_plot_list=aeus_plot_list,
-    #         show_plot_bar = False)
 
     #
     # #plotObj2 = Plot_amisrDB("alarm") #antig{uo ploteo}
@@ -86,27 +84,41 @@ def main():
     stats.updateNPows() # para getStatsTx y correlation
     stats.updateStatusTable()#necesario para los valores del pie, y las tablas
 
-    #fig_alarm = stats.getPlotsAlarms(DataAlarm)
-    #power_figure = stats.getPlotTotal("power",interval=60)
+    fig_alarm = stats.getPlotsAlarms(DataAlarm)
+    power_figure = stats.getPlotTotal("power",interval=60)
     #
-    #f,list = stats.getPlotPanels()
-    # fig_stats = stats.getStatsTx()
-    # fig_xcorr = stats.getCrossCorrelation()
-    # figs_pie, values_pie = stats.getPieRep()
-    # fig_rate, rate = stats.getRateFig("cero")
+    
+    fig_intervals = stats.getTxIntervals()
+    fig_xcorr = stats.getCrossCorrelation()
+    figs_pie, values_pie = stats.getPieRep()
+    fig_rate, rates = stats.getRateFig("cero", general=True)
+    table_rate, rates = stats.getTableRates()
+
     table_over, total_pow = stats.getOverview() #ejecutar getRateFig() antes
 
-    stats.show()
+    panel_rates=[]
+    for panel in range(14):
+        f, r = stats.getRateFig("cero", general=False, panel=(panel+1))
+        panel_rates.append([f,r])
+    
+    fig_panels,labels_list = stats.getPlotPanels("power", interval=60) #una hora, y sin especificar lista para obtener todos
+    
+
+    ###stats.show()
 
     #
-    # report.add_overview(table_over, total_pow, power_figure[0])
-    # report.addFigure(figs_pie, "pie", values_pie)
-    # report.addFigure(fig_stats, "stats")
-    # report.addFigure(fig_xcorr, "correlation")
-    # report.addFigure(fig_alarm, "alarm", None)
+    report.print_overview(table_over, total_pow, power_figure[0])
+    report.addFigure(figs_pie, "pie", values_pie)
+    report.addFigure(fig_intervals, "intervals")
+    report.print_rates(fig_rate, table_rate, rates)
+    report.addFigure(fig_xcorr, "correlation")
+    report.addFigure(fig_alarm, "alarm", None)
+
+    for i in range(14):
+        report.print_panel(fig_panels[i][0],fig_panels[i][1],panel_rates[i][0],panel_rates[i][1],labels_list[i])
     #
     # #
-    # report.getReport()
+    report.getReport()
     #
 
 

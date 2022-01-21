@@ -177,7 +177,7 @@ class STATS_AMISR():
 
     def updateNPows(self):
         """
-        Necesario llamarse esta función antes de getStatsTx(), getCrossCorrelation()
+        Necesario llamarse esta función antes de getTxIntervals(), getCrossCorrelation()
 
         """
         pd.options.mode.chained_assignment = None  # default='warn'
@@ -200,7 +200,8 @@ class STATS_AMISR():
                 except:
                     pass
             df.fillna(0)
-            self.df_tx_npows[r] = df
+            
+            self.df_tx_npows[r] = pd.DataFrame(signal.savgol_filter(df.values, 11, 4)) #ventana de , polinomio de 2
 
             m = (len(df) +1)- 60 # ventana del filtro, elegido para promediar y tener horas al final
 
@@ -215,7 +216,7 @@ class STATS_AMISR():
             self.data_npow[col] = df_filt['data_filt']
 
 
-    def getStatsTx(self, show = False):
+    def getTxIntervals(self, show = False):
         plt.close("all")
         self.setCustomStylePlot()
 
@@ -280,47 +281,68 @@ class STATS_AMISR():
         fig.canvas.draw()
         return fig
 
-    def getRate(self,dataframe):
-        data = dataframe#.sum(axis=1) #suma de noTx en paneles
-        n = len(data)
-        h = n//60
-        count=0
-        acum = 0
-        dataHours = pd.Series(np.zeros(h))
-        data.reset_index(inplace=True, drop=True) #empieza el indice desde cero
-        for index, value in data.items():
-            acum += value
-            if index%60==0 and index!=0:
-                dataHours[count] = acum/60
-                acum = 0
-                count +=1
+    def getRateFig(self, which, general=False, panel=None, fig=True):
+        data, y_pred, rate = None, None, None
+        #data = self.data_npow.iloc[:,0]
+        data = pd.DataFrame(self.df_tx_npows[0])
+        if general:
+            data = data.sum(axis=1)
+            fig_title = "AMISR-14 Radar fail rate"
+        else:
+            data = data.iloc[:,(panel-1)]
+            r,c = panel_to_rc(panel)
+            fig_title = "Panel R0{}-C{} fail rate".format(r,c)
 
-        from sklearn import linear_model
-        regr = linear_model.LinearRegression()
-        x = np.arange(len(dataHours)).reshape(-1, 1)
-        y = dataHours.values.reshape(-1, 1)
-        regr.fit(x, y)
-        Y_pred = regr.predict(x)
-        rate = 1/regr.coef_
-
-        return dataHours, Y_pred, rate[0][0]
-
-    def getRateFig(self, which):
-        data, pred, rate = None, None, None
+        data = pd.Series(signal.medfilt(data.to_numpy(),59 )) #datos filtrados ahora en reduce ruido
+        data = data.reset_index(drop=True)
+        
         if which=="cero":
-            data, pred, rate = self.getRate(self.data_npow.iloc[:,0])
+            #y_pred, rate = get_rate(data)
+            y_pred, rate = get_rate(data, func="polynomial", order=1)
+            if rate < 0:
+                rate = 0.00001
         else:
             pass
+            
+        if general:
+            self.rate = rate
+        
+        if not fig :
+            return rate
         fig, ax = plt.subplots(constrained_layout=True)
+        data.index = data.index/60
         data.plot(ax=ax)
-        ax.set_xlabel("horas operadas",fontsize=18)
-        ax.set_ylabel("AEU averiadas",fontsize=18)
-        ax.plot(pred, color='red')
+        ax.set_xlabel("working hours",fontsize=10)
+        ax.set_ylabel("AEU",fontsize=18)
+        ax.set_title(fig_title,fontsize=20)
+        ax.plot(data.index, y_pred, color='red')
+  
+        ax.grid()
         fig.canvas.draw()
-
-        self.rate = rate
-        #print("Rate: ", rate)
+        
         return fig, rate
+
+    def getTableRates(self):
+        rates = []
+        labels = []
+        for panel in range(14):
+            rate = self.getRateFig("cero",general=False, panel=(panel+1),fig=False)
+            rates.append(rate)
+            r, c = panel_to_rc(panel+1)    
+            labels.append("R0{}-C{}".format(r,c))
+        
+        tb_rate = pd.DataFrame(0, columns=labels, index=["rates"])
+        tb_rate.iloc[0,:]=rates
+        fig, ax = plt.subplots()
+        fig.set_size_inches(10, 1)
+        tb_rate.style
+        tb = table(ax, tb_rate, loc='center',figure =fig, fontsize=16,cellLoc='center')
+        ax.axis("off")
+        ax.set_title('Table 2. Panel fail rates (hours/AEU)',y=-0.15,fontsize=10)
+        plt.tight_layout()
+        fig.canvas.draw()
+        return fig, rates
+
 
     def getOverview(self, panel=None):
         start = 'Start ({})'.format(self.startdate)
@@ -485,8 +507,9 @@ class STATS_AMISR():
                 aeu_label_list.append("R0"+str(r)+"-C"+str(c)+" #"+str(k))
 
 
-        fig,ax =  plt.subplots()
-        fig.set_size_inches(10, 7)
+        fig,ax =  plt.subplots(constrained_layout=True)
+        if not sum:
+            fig.set_size_inches(11, 7)
         '''
         y_aeu -> [time_prom][panel]
         '''
@@ -500,27 +523,25 @@ class STATS_AMISR():
         if sum:
             y_aeus = y_aeus.mean(axis=1)
             y_aeus.plot(ax=ax, label="power")
-            ax.legend(bbox_to_anchor=(-0.06,1), loc="right", fontsize = "x-small", title = "legend")
+            #ax.legend(bbox_to_anchor=(-0.06,1), loc="right", fontsize = "x-small", title = "legend")
         else:
             y_aeus.columns = aeu_label_list
             for y in y_aeus.columns:
                 y_aeus[y].plot(ax=ax,label=y)
                 ax.legend(bbox_to_anchor=(-0.06,1), loc="upper right", fontsize = "x-small", title = "legend")
 
-        ax.set_xlabel('dates')
+        #ax.set_xlabel('dates',  fontsize=18)
+        ax.set_ylabel("power",fontsize=18)
+        ax.set_title("Panel R0{}-C{}".format(r,c), fontsize=20)
 
-
-        plt.title("Panel R0{}-C{}".format(r,c), fontsize=16)
-
+ 
         plt.setp(ax.get_xticklabels(), rotation=45)
-        plt.autoscale(enable=True, axis='x', tight=False)
-        plt.tight_layout()
+  
         ###ax.minorticks_on()->quita las fechas
         ax.grid()
         plt.grid(which='minor', color='#444444', linestyle='-', alpha=0.2)
-
+       
         fig.canvas.draw()
-        plt.show()
         return fig
 
 

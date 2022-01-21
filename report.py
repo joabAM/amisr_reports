@@ -3,6 +3,7 @@ from PIL import Image
 import numpy as np
 import os
 import datetime
+from utils import *
 
 class PDF(FPDF, HTMLMixin):
     def footer(self):
@@ -15,7 +16,7 @@ class PDF(FPDF, HTMLMixin):
 
 
 fig_type={
-"stats":0, "correlation":1, "pie": 2, "alarm":3,"general":4
+"interval":0, "correlation":1, "pie": 2, "alarm":3,"general":4
 }
 table_type={
 "aeu_list":0,"aeu_reps":1
@@ -66,6 +67,19 @@ in the AMISR Antenna Element Units (AEU), since during the event in november 202
 showed multiple alarms simultaneously in all panels.
 </p>
 """
+text_fail_rate1="""<font size=12></p>The failure rate of the AMISR-14 radar throughout the hours
+operated is graphed in the following figure, likewise there is a linear adjustment to the number
+of failures, from that curve the rate has been calculated. The failure rate has units of AEU/h which is
+a small number, so the hours/AEU has been displayed in the overview box instead.
+</p>
+"""
+text_fail_rate2="""<font size=12></p>The following table shows the failure rate for each panel. These
+numbers are higher than the general rate because the number of failures is lower if only one panel is
+considered. However, if the amounts are added inversely, the same value would be obtained. than the 
+inverse of the general rate. The table is mainly referential, to see the behavior of each panel, a low 
+quantity indicates the panel has a higher failure rate.
+</p>
+"""
 class Report():
 
     pdf = None
@@ -114,7 +128,7 @@ class Report():
     def addFigure(self, figure, type, values = None, subtype=None):
         type = fig_type[type]
         if type == 0:
-            self.add_stats(figure)
+            self.add_intervals(figure)
             pass
         elif type == 1:
             self.add_correlation(figure)
@@ -125,12 +139,14 @@ class Report():
         elif type == 3:
             self.add_alarm(figure, values)
             pass
+        elif type == 4:
+            pass
         else:
             self.add_general(figure)
             return
         pass
 
-    def add_stats(self,figure):
+    def add_intervals(self,figure):
         print("creating stats image...")
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=18)
@@ -200,7 +216,7 @@ failed  {} ({:.1f}%) AEU depending of the failure in November 20.</p>""".format(
         self.pdf.set_xy(10,170)
         self.pdf.write_html(text2)
 
-    def add_overview(self,table, power, power_figure):
+    def print_overview(self,table, power, power_figure):
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=18)
         text = "Overview of AMISR-14 working status"
@@ -234,6 +250,60 @@ following graph, where the blue line is the one obtained by adding all the AEUs.
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
         self.pdf.image(img, x=20, y=self.pdf.eph/3, h=self.pdf.eph/2, w=self.pdf.epw)
 
+    def print_rates(self, fig_rate, table_rate, rates):
+        self.pdf.add_page()
+        self.pdf.set_font("Times", "B", size=18)
+        text = "AMISR fail rates"
+        self.pdf.cell(10, 10, text, ln=1, align='L')
+
+        self.pdf.set_xy(10,20)
+        self.pdf.write_html(text_fail_rate1)
+        figure = fig_rate
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=40, y=60, h=self.pdf.eph/3, w=self.pdf.epw/1.5)
+
+
+        self.pdf.set_xy(10,160)
+        self.pdf.write_html(text_fail_rate2)
+        figure = table_rate
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=10, y=185, h=40, w=self.pdf.epw/1.1)
+
+    def print_panel(self, fig_total, fig_aeu, fig_rate, rate, label ):
+         
+        self.pdf.add_page()
+        self.pdf.set_font("Times", "B", size=18)
+        text = "Panel {} power transmited and rate".format(label)
+        self.pdf.cell(10, 10, text, ln=1, align='L')
+
+        self.pdf.set_xy(10,20)
+        text="""<font size="12"><p>The following figures shows the transmitting average power of 
+panel {} and its fail rate with equal to {:.5f} AEU/hour.</p>""".format(label,1/rate)
+        self.pdf.write_html(text)
+        figure = fig_total
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=20, y=60, h=80, w=80)
+
+        figure = fig_rate
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=110, y=60, h=72, w=80)
+
+        self.pdf.set_xy(10,160)
+        text="""<font size="12"><p>A general view of the power of the panel {} for each AEU is 
+shown in the graph bellow:</p>""".format(label)
+        self.pdf.write_html(text)
+        figure = fig_aeu
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=20, y=180, h=100, w=150)
+
+
+        
+        
 
     def getReport(self):
         self.pdf.output("pdf-amisr-report.pdf")
