@@ -200,7 +200,7 @@ class STATS_AMISR():
                 except:
                     pass
             df.fillna(0)
-            
+
             self.df_tx_npows[r] = pd.DataFrame(signal.savgol_filter(df.values, 11, 4)) #ventana de , polinomio de 2
 
             m = (len(df) +1)- 60 # ventana del filtro, elegido para promediar y tener horas al final
@@ -226,7 +226,7 @@ class STATS_AMISR():
         fig.tight_layout(h_pad=4, w_pad=1)
 
         prom_days = 60*24*2  #minutos en 2 días
-
+        print(self.df_tx_npows[0])
         for r in range(7): #por cada Label ie 0tx, 100, 200, etc
             df = self.df_tx_npows[r]
 
@@ -234,6 +234,7 @@ class STATS_AMISR():
             df_e    = df[-prom_days:].sum()/prom_days
             df_plt  = pd.concat([df_s,df_e-df_s],axis=1)
             df_plt.columns = ['start','inc']
+            print(df_plt)
             title="Power Tx {} watts".format(df_plt.index[0][6:])
             a = np.linspace(1,14,num=14)
             xlabel =[str(int(i)) for i in a]
@@ -295,7 +296,7 @@ class STATS_AMISR():
 
         data = pd.Series(signal.medfilt(data.to_numpy(),59 )) #datos filtrados ahora en reduce ruido
         data = data.reset_index(drop=True)
-        
+
         if which=="cero":
             #y_pred, rate = get_rate(data)
             y_pred, rate = get_rate(data, func="polynomial", order=1)
@@ -303,10 +304,10 @@ class STATS_AMISR():
                 rate = 0.00001
         else:
             pass
-            
+
         if general:
             self.rate = rate
-        
+
         if not fig :
             return rate
         fig, ax = plt.subplots(constrained_layout=True)
@@ -316,10 +317,10 @@ class STATS_AMISR():
         ax.set_ylabel("AEU",fontsize=18)
         ax.set_title(fig_title,fontsize=20)
         ax.plot(data.index, y_pred, color='red')
-  
+
         ax.grid()
         fig.canvas.draw()
-        
+
         return fig, rate
 
     def getTableRates(self):
@@ -328,9 +329,9 @@ class STATS_AMISR():
         for panel in range(14):
             rate = self.getRateFig("cero",general=False, panel=(panel+1),fig=False)
             rates.append(rate)
-            r, c = panel_to_rc(panel+1)    
+            r, c = panel_to_rc(panel+1)
             labels.append("R0{}-C{}".format(r,c))
-        
+
         tb_rate = pd.DataFrame(0, columns=labels, index=["rates"])
         tb_rate.iloc[0,:]=rates
         fig, ax = plt.subplots()
@@ -534,13 +535,13 @@ class STATS_AMISR():
         ax.set_ylabel("power",fontsize=18)
         ax.set_title("Panel R0{}-C{}".format(r,c), fontsize=20)
 
- 
+
         plt.setp(ax.get_xticklabels(), rotation=45)
-  
+
         ###ax.minorticks_on()->quita las fechas
         ax.grid()
         plt.grid(which='minor', color='#444444', linestyle='-', alpha=0.2)
-       
+
         fig.canvas.draw()
         return fig
 
@@ -549,6 +550,7 @@ class STATS_AMISR():
     def getPlotsAlarms(self,aeu_alarms,type="VSWR",minAEU=1,maxAEU=448):
 
         data = aeu_alarms
+
         data.index = [ datetime.datetime.strptime(x,"%Y-%m-%d %H:%M")- datetime.timedelta(hours=5) for x in data.index]
 
         minAEU = minAEU

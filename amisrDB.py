@@ -754,7 +754,7 @@ class DB_AMISR ():
 
         #Alarmas vacio para las 448 y el total de promedio
         dataAlarms = pd.Series(0, index=range(448))
-
+        aeu_alarms = pd.DataFrame(columns=range(449))
         k = 0
         i_df = 0
         if os.path.isfile(self.csvpathfile):
