@@ -10,7 +10,7 @@ import math
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
-
+matplotlib.rc('figure', max_open_warning = 0)
 from scipy import signal
 from utils import *
 
@@ -201,7 +201,7 @@ class STATS_AMISR():
                     pass
             df.fillna(0)
 
-            self.df_tx_npows[r] = pd.DataFrame(signal.savgol_filter(df.values, 11, 4)) #ventana de , polinomio de 2
+            #self.df_tx_npows[r] = pd.DataFrame(signal.savgol_filter(df.values, 11, 4)) #ventana de , polinomio de 2
 
             m = (len(df) +1)- 60 # ventana del filtro, elegido para promediar y tener horas al final
 
@@ -217,8 +217,8 @@ class STATS_AMISR():
 
 
     def getTxIntervals(self, show = False):
-        plt.close("all")
-        self.setCustomStylePlot()
+        #plt.close("all")
+        #self.setCustomStylePlot()
 
         fig, axes = plt.subplots(7,2)
         fig.set_dpi(200)
@@ -226,7 +226,7 @@ class STATS_AMISR():
         fig.tight_layout(h_pad=4, w_pad=1)
 
         prom_days = 60*24*2  #minutos en 2 días
-        print(self.df_tx_npows[0])
+        #print(self.df_tx_npows[0])
         for r in range(7): #por cada Label ie 0tx, 100, 200, etc
             df = self.df_tx_npows[r]
 
@@ -234,7 +234,6 @@ class STATS_AMISR():
             df_e    = df[-prom_days:].sum()/prom_days
             df_plt  = pd.concat([df_s,df_e-df_s],axis=1)
             df_plt.columns = ['start','inc']
-            print(df_plt)
             title="Power Tx {} watts".format(df_plt.index[0][6:])
             a = np.linspace(1,14,num=14)
             xlabel =[str(int(i)) for i in a]
@@ -567,7 +566,7 @@ class STATS_AMISR():
         plt.xticks(np.arange(1,len(data)+1, dtype=np.int),data.index,rotation=30)
         plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int),ylabel_aeu)
 
-        ax.xaxis.set_major_locator(plt.MaxNLocator(40))
+        ax.xaxis.set_major_locator(plt.MaxNLocator(10))
         ax.yaxis.set_major_locator(plt.MaxNLocator(30))
 
         plt.autoscale(enable=True, axis='x', tight=False)

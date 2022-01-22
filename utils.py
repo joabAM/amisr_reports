@@ -99,6 +99,10 @@ def get_rate(serie, func="parabolic", order=1):
     #AEU/min
     r = rate* 60        # AEU/hrs
     #print(r)
-    r = 1/r             # hrs/AEU
+    if math.isinf(r) or r < 0 or r==0:
+        return (data_fit), 0
+    r = 1/r             # hrs/AEU   
+    if r > 1000:
+        r = 1000 
     r = int(r*10)
     return (data_fit), r/10

@@ -794,7 +794,7 @@ class DB_AMISR ():
                             dataAlarms = dataAlarms | df
                             k += 1
                             if k == interval:
-                                date= _l[0]+' '+_l[1][:5]
+                                date= line[0]+' '+line[1][:5]
                                 k = 0
                                 aux = [date]+dataAlarms.tolist()
                                 aeu_alarms.loc[i_df] = aux
@@ -812,6 +812,7 @@ class DB_AMISR ():
 
             if aeuStatus:
                 aeu_alarms.set_index(0, inplace=True)
+                #print(aeu_alarms)
                 return aeu_alarms
 
             else:

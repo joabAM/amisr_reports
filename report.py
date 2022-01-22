@@ -279,8 +279,12 @@ following graph, where the blue line is the one obtained by adding all the AEUs.
         self.pdf.cell(10, 10, text, ln=1, align='L')
 
         self.pdf.set_xy(10,20)
+        if rate == 0:
+            new_rate=0
+        else:
+            new_rate = 1/rate
         text="""<font size="12"><p>The following figures shows the transmitting average power of 
-panel {} and its fail rate with equal to {:.5f} AEU/hour.</p>""".format(label,1/rate)
+panel {} and its fail rate with equal to {:.5f} AEU/hour.</p>""".format(label,new_rate)
         self.pdf.write_html(text)
         figure = fig_total
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')

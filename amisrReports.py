@@ -8,8 +8,8 @@ import os
 
 
 online = 0 # True or False 1 o 0
-startdate = '2021/12/10'  #formato yyyy/mm/dd para offline
-enddate = '2021/12/15'   #para offline
+startdate = '2021/10/01'  #formato yyyy/mm/dd para offline
+enddate = '2021/10/16'   #para offline
 hostname = '127.0.0.1 '
 username = 'soporte'
 password = 'soporte'
@@ -88,7 +88,7 @@ def main():
     power_figure = stats.getPlotTotal("power",interval=60)
     #
 
-    #fig_intervals = stats.getTxIntervals()
+    fig_intervals = stats.getTxIntervals()
     fig_xcorr = stats.getCrossCorrelation()
     figs_pie, values_pie = stats.getPieRep()
     fig_rate, rates = stats.getRateFig("cero", general=True)
@@ -109,9 +109,11 @@ def main():
     #
     report.print_overview(table_over, total_pow, power_figure)
     report.addFigure(figs_pie, "pie", values_pie)
-    #report.addFigure(fig_intervals, "intervals")
+    report.addFigure(fig_intervals, "interval")
     report.print_rates(fig_rate, table_rate, rates)
     report.addFigure(fig_xcorr, "correlation")
+
+
     report.addFigure(fig_alarm, "alarm", None)
 
     for i in range(14):
