@@ -8,8 +8,8 @@ import os
 
 
 online = 0 # True or False 1 o 0
-startdate = '2021/10/01'  #formato yyyy/mm/dd para offline
-enddate = '2021/10/16'   #para offline
+startdate = '2021/12/01'  #formato yyyy/mm/dd para offline
+enddate = '2021/12/16'   #para offline
 hostname = '127.0.0.1 '
 username = 'soporte'
 password = 'soporte'
@@ -95,6 +95,7 @@ def main():
     table_rate, rates = stats.getTableRates()
 
     table_over, total_pow = stats.getOverview() #ejecutar getRateFig() antes
+    fig_alarm2 = stats.getPlotsAlarmRate(DataAlarm)
 
     panel_rates=[]
     for panel in range(14):
@@ -114,7 +115,7 @@ def main():
     report.addFigure(fig_xcorr, "correlation")
 
 
-    report.addFigure(fig_alarm, "alarm", None)
+    report.addFigure(fig_alarm, "alarm", fig_alarm2)
 
     for i in range(14):
         report.print_panel(fig_panels[i][0],fig_panels[i][1],panel_rates[i][0],panel_rates[i][1],labels_list[i])

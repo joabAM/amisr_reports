@@ -575,6 +575,50 @@ class STATS_AMISR():
         fig_s.canvas.draw()
         return fig_s
 
+    def getPlotsAlarmRate(self,aeu_alarms,type="VSWR",minAEU=1,maxAEU=448):
+
+        data = aeu_alarms
+
+        data.index = [ datetime.datetime.strptime(x,"%Y-%m-%d %H:%M")- datetime.timedelta(hours=5) for x in data.index]
+
+        minAEU = minAEU
+        maxAEU = maxAEU
+        data_status = data.iloc[:,minAEU-1:maxAEU].to_numpy(dtype='float32')
+        data_status = np.transpose(data_status)
+        data_status_acum = data_status.sum(axis=1)
+        data_status_acum = pd.DataFrame(data_status_acum)
+        data_rate = pd.DataFrame(self.df_tx_npows[0])
+        data_rate = data_rate.sum(axis=1)
+        fig_title = "AMISR-14 Radar fail rate"
+
+        data_rate = pd.Series(signal.medfilt(data_rate.to_numpy(),59 )) #datos filtrados ahora en reduce ruido
+        data_rate = data_rate.reset_index(drop=True)
+
+
+        fig_s, ax = plt.subplots()
+        fig_s.set_size_inches(20, 8)
+        ax_2 = ax.twinx()
+
+        data_status_acum.plot.bar(ax=ax)
+        data_rate.plot(ax=ax_2)
+        #img = ax.imshow(data_status,aspect='auto', interpolation='none', cmap='YlGnBu_r',vmin=0, vmax=1)
+
+        #cbar = fig_s.colorbar(img, ticks=[0, 1])
+        #cbar.ax.set_yticklabels(['OK', type])  # vertically oriented colorbar
+        #ylabel_aeu = ["R0%d-C%d %02d"%(aeu_to_rc(n)) for n in range(minAEU,maxAEU+1)]
+
+        plt.xticks(np.arange(1,len(data)+1, dtype=np.int),data.index,rotation=30)
+        #plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int),ylabel_aeu)
+
+        ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(30))
+
+        plt.autoscale(enable=True, axis='x', tight=False)
+
+        plt.tight_layout()
+        fig_s.canvas.draw()
+        return fig_s
+
     def show(self):
         plt.show()
 

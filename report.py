@@ -248,7 +248,12 @@ following graph, where the blue line is the one obtained by adding all the AEUs.
 
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
-        self.pdf.image(img, x=20, y=self.pdf.eph/3, h=self.pdf.eph/2, w=self.pdf.epw)
+        self.pdf.image(img, x=20, y=60, h=self.pdf.eph/2, w=self.pdf.epw)
+
+        figure2 = values
+        data = np.fromstring(figure2.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure2.canvas.get_width_height(),data)
+        self.pdf.image(img, x=20, y=120, h=self.pdf.eph/2, w=self.pdf.epw)
 
     def print_rates(self, fig_rate, table_rate, rates):
         self.pdf.add_page()
