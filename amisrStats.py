@@ -102,8 +102,9 @@ class STATS_AMISR():
 
         df3.iloc[:,3:6] = df3.iloc[:,3:6].replace(to_replace=1.0, value=True)
         df3.iloc[:,3:6] = df3.iloc[:,3:6].replace(to_replace=0.0, value=False)
-        self.table_status_list = df3
-
+        df3['std'] = self.data.iloc[:,10:458].std(axis=0).values
+        self.table_status_list = df3.copy()
+        #print(df3.tail(10))
 
         self.Tx     =   df3[df3.Tx== True]
         self.noTx   =   df3[df3.Tx== False]
@@ -575,18 +576,31 @@ class STATS_AMISR():
         fig_s.canvas.draw()
         return fig_s
 
+    def getPanelDetail(self,n_panel):
+        r, c = panel_to_rc(n_panel)
+        panel = "R0{}-C{}".format(r,c)
+        df_panel = self.table_status_list.loc[self.table_status_list['Panel'] == panel]
+        df_panel.drop(["AEU","start Tx"],axis=1, inplace=True)
+        df_panel = df_panel.round(decimals=1)
+        html = df_panel.to_html(justify="justify-all", index=False, col_space=5)
+
+        return html
+
+
     def getPlotsAlarmRate(self,aeu_alarms,type="VSWR",minAEU=1,maxAEU=448):
 
         data = aeu_alarms
 
-        data.index = [ datetime.datetime.strptime(x,"%Y-%m-%d %H:%M")- datetime.timedelta(hours=5) for x in data.index]
-
+        #data.index = [ datetime.datetime.strptime(x,"%Y-%m-%d %H:%M")- datetime.timedelta(hours=5) for x in data.index]
+        leng = len(data)
         minAEU = minAEU
         maxAEU = maxAEU
         data_status = data.iloc[:,minAEU-1:maxAEU].to_numpy(dtype='float32')
         data_status = np.transpose(data_status)
         data_status_acum = data_status.sum(axis=1)
+
         data_status_acum = pd.DataFrame(data_status_acum)
+        data_status_acum = data_status_acum.where(data_status_acum<(leng/3),0)
         data_rate = pd.DataFrame(self.df_tx_npows[0])
         data_rate = data_rate.sum(axis=1)
         fig_title = "AMISR-14 Radar fail rate"
@@ -599,22 +613,15 @@ class STATS_AMISR():
         fig_s.set_size_inches(20, 8)
         ax_2 = ax.twinx()
 
-        data_status_acum.plot.bar(ax=ax)
-        data_rate.plot(ax=ax_2)
-        #img = ax.imshow(data_status,aspect='auto', interpolation='none', cmap='YlGnBu_r',vmin=0, vmax=1)
+        data_status_acum.plot.bar(ax=ax, label="alarms")
+        data_rate.plot(ax=ax_2,color='r', label="rates")
 
-        #cbar = fig_s.colorbar(img, ticks=[0, 1])
-        #cbar.ax.set_yticklabels(['OK', type])  # vertically oriented colorbar
-        #ylabel_aeu = ["R0%d-C%d %02d"%(aeu_to_rc(n)) for n in range(minAEU,maxAEU+1)]
+        #ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+        #ax.yaxis.set_major_locator(plt.MaxNLocator(30))
 
-        plt.xticks(np.arange(1,len(data)+1, dtype=np.int),data.index,rotation=30)
-        #plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int),ylabel_aeu)
-
-        ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-        ax.yaxis.set_major_locator(plt.MaxNLocator(30))
-
-        plt.autoscale(enable=True, axis='x', tight=False)
-
+        #plt.autoscale(enable=True, axis='x', tight=False)
+        plt.grid()
+        plt.legend()
         plt.tight_layout()
         fig_s.canvas.draw()
         return fig_s

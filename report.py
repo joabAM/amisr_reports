@@ -75,8 +75,8 @@ a small number, so the hours/AEU has been displayed in the overview box instead.
 """
 text_fail_rate2="""<font size=12></p>The following table shows the failure rate for each panel. These
 numbers are higher than the general rate because the number of failures is lower if only one panel is
-considered. However, if the amounts are added inversely, the same value would be obtained. than the 
-inverse of the general rate. The table is mainly referential, to see the behavior of each panel, a low 
+considered. However, if the amounts are added inversely, the same value would be obtained. than the
+inverse of the general rate. The table is mainly referential, to see the behavior of each panel, a low
 quantity indicates the panel has a higher failure rate.
 </p>
 """
@@ -248,12 +248,12 @@ following graph, where the blue line is the one obtained by adding all the AEUs.
 
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
-        self.pdf.image(img, x=20, y=60, h=self.pdf.eph/2, w=self.pdf.epw)
+        self.pdf.image(img, x=30, y=50, h=120, w=180)
 
         figure2 = values
         data = np.fromstring(figure2.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure2.canvas.get_width_height(),data)
-        self.pdf.image(img, x=20, y=120, h=self.pdf.eph/2, w=self.pdf.epw)
+        self.pdf.image(img, x=50, y=180, h=80, w=120)
 
     def print_rates(self, fig_rate, table_rate, rates):
         self.pdf.add_page()
@@ -277,7 +277,7 @@ following graph, where the blue line is the one obtained by adding all the AEUs.
         self.pdf.image(img, x=10, y=185, h=40, w=self.pdf.epw/1.1)
 
     def print_panel(self, fig_total, fig_aeu, fig_rate, rate, label ):
-         
+
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=18)
         text = "Panel {} power transmited and rate".format(label)
@@ -288,7 +288,7 @@ following graph, where the blue line is the one obtained by adding all the AEUs.
             new_rate=0
         else:
             new_rate = 1/rate
-        text="""<font size="12"><p>The following figures shows the transmitting average power of 
+        text="""<font size="12"><p>The following figures shows the transmitting average power of
 panel {} and its fail rate with equal to {:.5f} AEU/hour.</p>""".format(label,new_rate)
         self.pdf.write_html(text)
         figure = fig_total
@@ -302,7 +302,7 @@ panel {} and its fail rate with equal to {:.5f} AEU/hour.</p>""".format(label,ne
         self.pdf.image(img, x=110, y=60, h=72, w=80)
 
         self.pdf.set_xy(10,160)
-        text="""<font size="12"><p>A general view of the power of the panel {} for each AEU is 
+        text="""<font size="12"><p>A general view of the power of the panel {} for each AEU is
 shown in the graph bellow:</p>""".format(label)
         self.pdf.write_html(text)
         figure = fig_aeu
@@ -310,9 +310,20 @@ shown in the graph bellow:</p>""".format(label)
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
         self.pdf.image(img, x=20, y=180, h=100, w=150)
 
+    def print_panel_detail(self, panel_text):
+        self.pdf.add_page()
+        self.pdf.set_font("Times", "B", size=18)
+        text = "Panel repairments and status list"
+        self.pdf.cell(10, 10, text, ln=1, align='L')
 
         
-        
+        self.pdf.set_xy(10,20)
+        text = panel_text
+        text= text.replace("<th ","<th width=15 ")
+        #print(text)
+        self.pdf.set_font("Times", size=8)
+        self.pdf.write_html(text)
+
 
     def getReport(self):
         self.pdf.output("pdf-amisr-report.pdf")

@@ -83,7 +83,7 @@ def get_rate(serie, func="parabolic", order=1):
     data = serie
     med = len(data.index)/(2*60) #valor medio hrs
     y = data.values
-    x = data.index 
+    x = data.index
     if func == "polynomial":
         pol = np.polyfit(x, y, order)
         poly = np.poly1d(pol)
@@ -95,14 +95,14 @@ def get_rate(serie, func="parabolic", order=1):
         popt, pcov = curve_fit(f, x, y)
         data_fit = f(x,*popt)
         rate = (f(med,*popt) - f((med-1),*popt))
-    
+
     #AEU/min
     r = rate* 60        # AEU/hrs
     #print(r)
     if math.isinf(r) or r < 0 or r==0:
         return (data_fit), 0
-    r = 1/r             # hrs/AEU   
+    r = 1/r             # hrs/AEU
     if r > 1000:
-        r = 1000 
+        r = 1000
     r = int(r*10)
     return (data_fit), r/10
