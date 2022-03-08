@@ -100,18 +100,32 @@ class STATS_AMISR():
         df3 = pd.concat([self.rMant,noTx2,start_Tx,start_power,end_power],axis=1,ignore_index=False)
         df3 = df3.fillna(value=0, axis=1)
 
-        df3.iloc[:,3:6] = df3.iloc[:,3:6].replace(to_replace=1.0, value=True)
-        df3.iloc[:,3:6] = df3.iloc[:,3:6].replace(to_replace=0.0, value=False)
+        self.flags_reps = [col for col in df3 if col.startswith('flag_rep')]
+        number_flags = len(self.flags_reps)+1 #+1 añade el fNov
+        df3.iloc[:,3:(3+number_flags)] = df3.iloc[:,3:(3+number_flags)].astype('bool')
+        df3.iloc[:,3:(3+number_flags)] = df3.iloc[:,3:(3+number_flags)].astype('bool')
+        # df3.iloc[:,3:6] = df3.iloc[:,3:(3+number_flags)].replace(to_replace=1.0, value=True)
+        # df3.iloc[:,3:6] = df3.iloc[:,3:(3+number_flags)].replace(to_replace=0.0, value=False)
+        #print(df3.dtypes)
+        #print(df3.head)
         df3['std'] = self.data.iloc[:,10:458].std(axis=0).values
         self.table_status_list = df3.copy()
         #print(df3.tail(10))
 
         self.Tx     =   df3[df3.Tx== True]
         self.noTx   =   df3[df3.Tx== False]
-        self.noTxnoRep  =   self.noTx[(self.noTx.fail_Nov == 0 )  & (self.noTx.rep_bef_nov == 0 ) & (self.noTx.rep_aft_nov == 0 ) ]
-        self.noTxRep    =   self.noTx[(self.noTx.fail_Nov == 1 ) | (self.noTx.rep_bef_nov == 1 ) | (self.noTx.rep_aft_nov == 1 )  ]
-        self.noTxFnov   =   self.noTx[ self.noTx.fail_Nov == 1 ]
-        self.noTxnoFnov =   self.noTx[self.noTx.fail_Nov == 0 ]
+
+
+
+        self.noTxnoRep = self.noTx[eval(" & ".join(["(self.noTx['{}'] == False)".format(flag) for flag in self.flags_reps]))]
+        #print(self.noTxnoRep)
+        self.noTxRep = self.noTx[eval(" | ".join(["(self.noTx['{}'] == True)".format(flag) for flag in self.flags_reps]))]
+        #print(self.noTxnoRep)
+        #self.noTxnoRep  =   self.noTx[(self.noTx.flag_fNov == 0 )  & (self.noTx.flag_rep_17 == 0 ) & (self.noTx.flag_rep_20 == 0 ) ]
+        #self.noTxRep    =   self.noTx[(self.noTx.flag_fNov == 1 ) | (self.noTx.flag_rep_17 == 1 ) | (self.noTx.flag_rep_20 == 1 )  ]
+
+        self.noTxFnov   =   self.noTx[ self.noTx.flag_fNov == True ]
+        self.noTxnoFnov =   self.noTx[self.noTx.flag_fNov == False ]
 
         self.total_power_start  =   self.table_status_list["start Watts"].sum()/1000
         self.total_power_end    =   self.table_status_list["end Watts"].sum()/1000
@@ -358,10 +372,14 @@ class STATS_AMISR():
         index=pd.Index(['Power (Kw)', 'Tx','no Tx','hours','no Tx and Rep','no Tx no Rep','new damaged','rate (hours/AEU)'])
         Tx     =   status_table[status_table.Tx== True]
         noTx   =   status_table[status_table.Tx== False]
-        noTxnoRep  =   noTx[(noTx.fail_Nov == 0 )  & (noTx.rep_bef_nov == 0 ) & (noTx.rep_aft_nov == 0 ) ]
-        noTxRep    =   noTx[(noTx.fail_Nov == 1 ) | (noTx.rep_bef_nov == 1 ) | (noTx.rep_aft_nov == 1 )  ]
-        noTxFnov   =   noTx[noTx.fail_Nov == 1 ]
-        noTxnoFnov =   noTx[noTx.fail_Nov == 0 ]
+
+        noTxnoRep = noTx[eval(" & ".join(["""(noTx['{}'] == False)""".format(flag) for flag in self.flags_reps]))]
+
+        noTxRep = noTx[eval(" | ".join(["""(noTx['{}'] == True)""".format(flag) for flag in self.flags_reps]))]
+
+
+        noTxFnov   =   noTx[noTx.flag_fNov == True ]
+        noTxnoFnov =   noTx[noTx.flag_fNov == False ]
 
 
         tb_over = pd.DataFrame(columns=columns, index=index)

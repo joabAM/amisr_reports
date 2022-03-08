@@ -195,7 +195,7 @@ following figure)</p>"""
         self.pdf.set_font_size(size=12)
         img1 = Image.frombytes('RGB', figures[0].canvas.get_width_height(),data1)
         text1 = """<font size="12"><p>This figure shows the number of working AEU: {} ({:.1f}%) vs the non working:
-{} ({:.1f}%) on {}.</p>""".format(values[0],values[0]*t,values[1],values[1]*t,self.end_date)
+{} ({:.1f}%) until {}.</p>""".format(values[0],values[0]*t,values[1],values[1]*t,self.end_date)
 
         #self.pdf.set_xy(40)
         self.pdf.image(img1, x=70,y=90, h=80, w=80)
@@ -311,17 +311,17 @@ shown in the graph bellow:</p>""".format(label)
         self.pdf.image(img, x=20, y=180, h=100, w=150)
 
     def print_panel_detail(self, panel_text):
-        self.pdf.add_page()
+        self.pdf.add_page(orientation='L')
         self.pdf.set_font("Times", "B", size=18)
         text = "Panel repairments and status list"
         self.pdf.cell(10, 10, text, ln=1, align='L')
 
-        
-        self.pdf.set_xy(10,20)
+
+        self.pdf.set_xy(10,15)
         text = panel_text
-        text= text.replace("<th ","<th width=15 ")
+        text= text.replace("<th ","<th width=20 ")
         #print(text)
-        self.pdf.set_font("Times", size=8)
+        self.pdf.set_font("Times", size=10)
         self.pdf.write_html(text)
 
 
