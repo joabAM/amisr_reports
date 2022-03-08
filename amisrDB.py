@@ -17,7 +17,7 @@ from pytz import timezone
 import numpy as np
 import paramiko
 import pandas as pd
-
+import smtplib
 import aeustatus_sri as aeuST
 import fileinput
 
@@ -77,7 +77,7 @@ class DB_AMISR ():
         self.password = password
         self.key      = key_file
         self.dataBasePath = dataBasePath
-        self.period = period
+        self.period_online = period
         self.email_recipients =  [email_1]
         if email_2 != None:
             self.email_recipients.append(email_2)
@@ -151,8 +151,12 @@ class DB_AMISR ():
 
         if self.online:
             if len(remote_files_list) > self.period_online:
-                remote_files_list = remote_files_list[-2] #trabaja con el penultimo archivo
+                remote_files_list = [remote_files_list[-2]] #trabaja con el penultimo archivo
+                print("online mode, reading file ",remote_files_list)
+            else:
+                return
         for remote_file in remote_files_list:
+            print("getting ",(source+remote_file) )
             sftp_client.get(source+remote_file,  self.bz2path+remote_file)
         sftp_client.close()
 
@@ -238,7 +242,8 @@ class DB_AMISR ():
         xml file name = 20140822-000000-umet.xml, date + time + umet+ext
         '''
         #print(xml_list, ":.........................")
-        xml_list.sort(key=lambda date: datetime.datetime.strptime(date, "%Y%m%d-%H%M%S-umet.xml"))
+        if not self.online:
+            xml_list.sort(key=lambda date: datetime.datetime.strptime(date, "%Y%m%d-%H%M%S-umet.xml"))
 
         #print(xml_list, "#####################3")
         AEU = [0] * 448 # 448 = 32 x 14
@@ -259,7 +264,7 @@ class DB_AMISR ():
         #print("lista", xml_list)
         pow_var=self.labels_status_gnral
 
-
+        op_ = False
 
         for i in range(len(xml_list)):
             filepath =  self.bz2path + xml_list[i]
@@ -379,15 +384,17 @@ class DB_AMISR ():
                 REV_Volts = [0.0] * 448 #almacena el voltaje reverso
                 m8volts = [0.0] * 448
                 #print("xml day", xml_list[i])
-
+                op_ = True
 
             else:
+                if self.online:
+                    print("no data for date: ",datetime.datetime.strptime(date_ +" "+ time_,"%Y-%m-%d %H:%M:%S"))
                 #print("No data in xml file...")
                 self.n_empty_files = self.n_empty_files + 1
-
+                op_ = False
 
             os.remove(filepath)        #elimina el xml una vez leído
-
+        return op_
 
     def writeDB(self, startdate, enddate, dataType):
 
@@ -427,7 +434,7 @@ class DB_AMISR ():
         else:
             today   = datetime.date.today()
             year    = today.year
-            doyear  = str(today.timetuple()[7]).zfill(3)
+            doyear  = str(today.timetuple()[7])
 
             self.find_new_bz2(year, doyear)
             self.read_xml()
@@ -545,7 +552,7 @@ class DB_AMISR ():
             print("There is no data")
 
     def run_online(self):
-        msg_sended = 0
+        msg_sended = 1
         while True:
             self.writeDB(None, None, None)
             if self.curret_amisr_status[5] < self.power_limit_alert:
@@ -553,10 +560,10 @@ class DB_AMISR ():
                 self.send_alert(self.curret_amisr_status,self.curr_day)
                 msg_sended +=1
 
-            print(self.labels_status_gnral)
+            print("\n",self.labels_status_gnral)
             print(self.curret_amisr_status)
 
-            time.sleep(self.period)
+            time.sleep(self.period_online)
             if msg_sended > 3:
                 print("Online monitoring finished...")
                 break
@@ -569,9 +576,9 @@ class DB_AMISR ():
 
         subject = 'AMISR-14 POWER ALERT'
         str1 = ' \t'.join(self.labels_status_gnral )
-        str2 = ' \t'.join(power_status)
+        #str2 = ' \t'.join(power_status)
         message += str1+'\n'
-        message += str2
+        #message += str2
         message = 'Subject: {}\n\n{}'.format(subject, message)
         server = smtplib.SMTP('smtp.gmail.com',587)
         server.starttls()

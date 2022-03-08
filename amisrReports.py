@@ -87,7 +87,7 @@ def main(kwargs):
     ###objeto base de datos
     dbObj = amisrDB.DB_AMISR(xml_path,bz2path,dataBasePath, hostname, username,
                            password, online=online,key_file=pkey, period=period,
-                           email_1=e_sender,email_2=email2,email_3=email3,
+                           email_1=email1,email_2=email2,email_3=email3,
                            email_sender=e_sender,email_pass=e_pass,limit_alert=min_power)
     if online==True:
         dbObj.run_online()
@@ -238,7 +238,9 @@ if __name__ == '__main__':
     parser.add_argument("--user",type=str, default='soporte', help="user")
     parser.add_argument("--password",type=str, default='soporte', help="password")
     parser.add_argument("--xml_path",type=str, default='/media/soporte/DATA/dataAMISR/xmls/', help="path to data")
-    parser.add_argument("--period_online",type=str, default=None, help="period to check status in seconds")
+    parser.add_argument("--key_path",type=str, default=None, help="path to key")
+
+    parser.add_argument("--period_online",type=int, default=None, help="period to check status in seconds")
     parser.add_argument("--email_sender",type=str, default=None, help="email sender")
     parser.add_argument("--email_password",type=str, default=None, help="password sender")
     parser.add_argument("--email_cc1",type=str, default=None, help="copy msg")
