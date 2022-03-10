@@ -93,6 +93,8 @@ class DB_AMISR ():
         self.nAeusTx = (448/2 +1) #mas de la mitad transmitiendo para considerarlo útil
         if self.online:
             self.nAeusTx = 0
+        self.check_last_date = False
+
 
     def getPanelList(self):
 
@@ -111,11 +113,10 @@ class DB_AMISR ():
             self.csvpathfile =  self.dataBasePath +'dataCurrent.csv'
         elif self.DataType == 3:     # Alarmas
             self.csvpathfile = self.dataBasePath +'dataAlarm.csv'
-        elif self.DataType == 4:     #Temperaturas
-            if temperatureType == 1:
-                self.csvpathfile = self.dataBasePath +'dataTemperatureSSPA.csv'
-            if temperatureType == 2:
-                self.csvpathfile = self.dataBasePath +'dataTemperatureCRTL.csv'
+        elif self.DataType == 41:     #Temperaturas
+            self.csvpathfile = self.dataBasePath +'dataTemperatureSSPA.csv'
+        elif self.DataType == 42:
+            self.csvpathfile = self.dataBasePath +'dataTemperatureCRTL.csv'
         elif self.DataType == 5:     # voltaje SSPA
             self.csvpathfile = self.dataBasePath +'dataSSPAvolts.csv'
         elif self.DataType == 6:     # voltajes Dir
@@ -463,7 +464,9 @@ class DB_AMISR ():
         interval *=60 # ahora interval en minutos interval = 2*15*plot_interval
         if interval == 0:
             interval = 1
-        print("data Prom {}: {:2d} min".format(strdata, int(interval)))
+
+        if not self.check_last_date:
+            print("data Prom {}: {:2d} min".format(strdata, int(interval)))
 
 
         startIndex = 2 # primeros 2 son hora
@@ -488,7 +491,8 @@ class DB_AMISR ():
                 s_date = start_plot_date
                 e_date = end_plot_date
 
-                print(s_date, e_date)
+                if not self.check_last_date:
+                    print(s_date, e_date)
                 s_date = datetime.datetime.strptime(s_date,"%Y-%m-%d").date()
                 e_date = datetime.datetime.strptime(e_date,"%Y-%m-%d").date() + datetime.timedelta(days=1)
                 day_date = s_date
@@ -498,11 +502,13 @@ class DB_AMISR ():
                 valid_lines = 0
                 M = 0
                 #print("tot lines",len(lines))
+                date = None
                 for line in csvFile:          #cada línea de la lista son muestras cada 1 min
                     line = line.rstrip("\n")
                     line = line.split(",")
                     date = datetime.datetime.strptime(line[0]+line[1],"%Y-%m-%d%H:%M:%S")
-
+                    if self.check_last_date:
+                        continue
                     if (date.date() >= s_date and date.date() <= e_date):       #Rango de fechas validos
                         #print(index_line)
                         #-----------------------------------------------------------------------------------------
@@ -533,6 +539,9 @@ class DB_AMISR ():
                         valid_lines += 1
 
                     index_line += 1
+
+            if self.check_last_date:
+                return date             #retorna la ultima fecha
 
             if aeuStatus:
                 aeu_alarms.set_index(0, inplace=True)
@@ -586,3 +595,15 @@ class DB_AMISR ():
         server.login(self.email_sender,self.email_password)
         server.sendmail(self.email_sender, dest_mail, message)
         server.quit()
+
+    def last_database_dates(self):
+        self.check_last_date = True
+        data_types=[1,2,3,41,42,5,6,7]
+        for dataTypeInt in data_types:
+            self.definePath(dataTypeInt)
+            try:
+                last_date = self.readDB(encodeDataType(dataTypeInt), '2014/01/01', '2030/01/01')
+                print("Last date for \t{:<25} \tis \t{}".format(os.path.split(self.csvpathfile)[1],last_date))
+            except:
+                print("There is no {} database file...".format(os.path.split(self.csvpathfile)[1]))
+        return

@@ -3,16 +3,28 @@ import numpy as np
 import math
 
 def decodeDataType(dataTypeStr):
-    dictDataType = {"power":1, "current":2, "alarm":3, "temperature":4,
+    dictDataType = {"power":1, "current":2, "alarm":3, "temperature1":41,"temperature2":41,
                     "SSPA volts":5, "volts dir":6, "volts rev":7,
                     "-8 volts":8
                     }
     return dictDataType[dataTypeStr]
 
-def decodeAlarm(type):
+def encodeDataType(dataTypeInt):
+    dictDataType = {1:"power", 2:"current", 3:"alarm", 41:"temperature1", 42:"temperature2",
+                    5:"SSPA volts", 6:"volts dir", 7:"volts rev",
+                    8:"-8 volts"
+                    }
+    return dictDataType[dataTypeInt]
+
+def decodeAlarm(typeStr):
     dictaAlarm={"temp":1, "vswr":2, "sum":3}
 
-    return dictaAlarm[type]
+    return dictaAlarm[typeStr]
+
+def encodeAlarm(typeInt):
+    dictaAlarm={1:"temp", 2:"vswr", 3:"sum"}
+
+    return dictaAlarm[typeInt]
 
 '''
 Numeración de Paneles 1 al 14

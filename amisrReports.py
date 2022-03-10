@@ -69,6 +69,7 @@ def main(kwargs):
     email1 = keys.get("email_dest")
     min_power = keys.get("power_alert")
 
+    flag_last_date = keys.get("check_last_date")
 
 
     dataType = keys.get("dataType")
@@ -89,6 +90,10 @@ def main(kwargs):
                            password, online=online,key_file=pkey, period=period,
                            email_1=email1,email_2=email2,email_3=email3,
                            email_sender=e_sender,email_pass=e_pass,limit_alert=min_power)
+    if flag_last_date:
+        dbObj.last_database_dates()
+        return
+        
     if online==True:
         dbObj.run_online()
 
@@ -234,10 +239,10 @@ if __name__ == '__main__':
     parser.add_argument("--endDate",type=str, default=None, help="Date DD/MM/YYYY")
     parser.add_argument("--interval",type=int, default='60', help="plot interval")
     parser.add_argument("--interval_alarm",type=int, default='6', help="plot interval for alarm")
-    parser.add_argument("--host",type=str, default='127.0.0.1', help="IP server xml")
-    parser.add_argument("--user",type=str, default='soporte', help="user")
-    parser.add_argument("--password",type=str, default='soporte', help="password")
-    parser.add_argument("--xml_path",type=str, default='/media/soporte/DATA/dataAMISR/xmls/', help="path to data")
+    parser.add_argument("--host",type=str, default='10.10.40.121', help="IP server xml")
+    parser.add_argument("--user",type=str, default='umetops', help="user")
+    parser.add_argument("--password",type=str, default='amisr beam scan', help="password")
+    parser.add_argument("--xml_path",type=str, default='/data/amisr/array/status/', help="path to data")
     parser.add_argument("--key_path",type=str, default=None, help="path to key")
 
     parser.add_argument("--period_online",type=int, default=None, help="period to check status in seconds")
@@ -248,6 +253,7 @@ if __name__ == '__main__':
     parser.add_argument("--email_dest",type=str, default=None, help="main recipient")
     parser.add_argument("--power_alert",type=int, default=150, help="minimum power to send alert")
 
+    parser.add_argument("--check_last_date",type=bool, default=False, help="show last dates of database files")
 
     parser.add_argument("--add_tables",type=bool, default=True, help="tables of status per panel")
     parser.add_argument("--add_pie",type=bool, default=True, help="page of pie charts")
