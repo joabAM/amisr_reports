@@ -7,7 +7,7 @@ import argparse
 import os
 
 
-online = 0 # True or False 1 o 0
+online = False # True or False 1 o 0
 # startdate = '2021/08/15'  #formato yyyy/mm/dd para offline
 # enddate = '2022/03/01'   #para offline
 # hostname = '127.0.0.1'
@@ -52,6 +52,9 @@ bz2path = curr_path+"/bz2dir/"
 
 def main(kwargs):
     keys = vars(kwargs)
+
+    report_name = keys.get("report_name")
+
     online = keys.get("online")
     flag_R_W = keys.get("read_write")
     startdate = keys.get("startDate")
@@ -69,8 +72,10 @@ def main(kwargs):
     email1 = keys.get("email_dest")
     min_power = keys.get("power_alert")
 
-    flag_last_date = keys.get("check_last_date")
+    noFilterOutliers = keys.get("no_removeOutliers")
+    filter_Npoints = keys.get("filter_points")
 
+    flag_last_date = keys.get("check_last_date")
 
     dataType = keys.get("dataType")
     interval = keys.get("interval")
@@ -79,13 +84,14 @@ def main(kwargs):
     flag_add_tables = keys.get("add_tables")
     flag_add_pie = keys.get("add_pie")
     flag_add_panels = keys.get("add_panels")
-
-
+    panel_list = keys.get("panels_list")
+    print("")
 
 
 
     ################################ESCRIBIR BASES DE DATOS en CSV
     ###objeto base de datos
+
     dbObj = amisrDB.DB_AMISR(xml_path,bz2path,dataBasePath, hostname, username,
                            password, online=online,key_file=pkey, period=period,
                            email_1=email1,email_2=email2,email_3=email3,
@@ -93,8 +99,8 @@ def main(kwargs):
     if flag_last_date:
         dbObj.last_database_dates()
         return
-        
-    if online==True:
+
+    if online:
         dbObj.run_online()
 
     else:
@@ -110,10 +116,11 @@ def main(kwargs):
             #lectura de ALARMA, solo vswr, retorna data y date
 
             DataAlarm = dbObj.readDB("alarm",startdate,enddate,aeuStatus = True,read_interval=interval_a ,alarmType="vswr")
+            Data_tempSSPA = dbObj.readDB("temperature1",startdate,enddate)
 
-            stats = STATS_AMISR(type=dataType, data=DataDB )
-            #stats = STATS_AMISR()#contructor vacio, prueba de alarmas
+            stats = STATS_AMISR(type="power", data=DataDB, no_filt=noFilterOutliers, panels=panel_list)
 
+            stats_temp = STATS_AMISR(type="temperature1", data=Data_tempSSPA, no_filt=True, panels=panel_list)
             #
             # #plotObj2 = Plot_amisrDB("alarm") #antig{uo ploteo}
             #
@@ -122,7 +129,7 @@ def main(kwargs):
 
 
 
-            report = Report(stats.startdate,stats.enddate)   #clase pdf report
+            report = Report(stats.startdate,stats.enddate, filename=report_name)   #clase pdf report
 
 
             stats.updateNPows() # para getStatsTx y correlation
@@ -130,31 +137,40 @@ def main(kwargs):
 
             fig_alarm = stats.getPlotsAlarms(DataAlarm)
             power_figure = stats.getPlotTotal(dataType,interval=60)
-            #
+            ##
 
             fig_intervals = stats.getTxIntervals()
             fig_xcorr = stats.getCrossCorrelation()
             figs_pie, values_pie = stats.getPieRep()
-            fig_rate, rates = stats.getRateFig("cero", general=True)
+            fig_rate, rates = stats.getRateFig("cero", general=True, filter_points=filter_Npoints)
+
             table_rate, rates = stats.getTableRates()
+
 
             table_over, total_pow = stats.getOverview() #ejecutar getRateFig() antes
             fig_alarm2 = stats.getPlotsAlarmRate(DataAlarm)
-
+            #fig_alarm2 = None
             panel_rates=[]
+            panel_alarms_vswr = []
+
             for panel in range(14):
-                f, r = stats.getRateFig("cero", general=False, panel=(panel+1))
+                f, r = stats.getRateFig("cero", general=False, panel=(panel+1), filter_points=filter_Npoints)
                 panel_rates.append([f,r])
+                min_aeu = ((panel*32)+1)
+                max_aeu = ((panel+1)*32)
+                #print(min_aeu,max_aeu)
+                panel_alarms_vswr.append(stats.getPlotsAlarms(DataAlarm,minAEU=min_aeu,maxAEU=max_aeu))
 
-            fig_panels,labels_list = stats.getPlotPanels(dataType, interval=60) #una hora, y sin especificar lista para obtener todos
 
+            fig_panels,labels_list = stats.getPlotPanels("power", interval=60) #una hora, y sin especificar lista para obtener todos
+            fig_panels_temp, labels_list2= stats_temp.getPlotPanels("temperature", interval=60)
             panel_details=[]
             for panel in range(14):
                 panel_details.append(stats.getPanelDetail(n_panel=(panel+1)))
 
-            ###stats.show()
 
-            #
+
+            ##
             report.print_overview(table_over, total_pow, power_figure)
             if flag_add_pie:
                 report.addFigure(figs_pie, "pie", values_pie)
@@ -165,12 +181,22 @@ def main(kwargs):
 
             report.addFigure(fig_alarm, "alarm", fig_alarm2)
 
+
+            print("\nCreating panel figures...")
             for i in range(14):
+
+                # if panel_list != "all":
+                #     if str(i+1) not in panel_list.split(","):
+                #         continue
                 report.print_panel(fig_panels[i][0],fig_panels[i][1],panel_rates[i][0],panel_rates[i][1],labels_list[i])
+                report.print_panel2(panel_alarms_vswr[i],fig_panels_temp[i], None,None)
                 if flag_add_tables:
                     report.print_panel_detail(panel_details[i])
-            #
-            # #
+            print("Panel figures done")
+
+
+
+
             report.getReport()
             #
 
@@ -233,19 +259,21 @@ def main(kwargs):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--read_write",type=str, default="read", help="read = True , write = False")
-    parser.add_argument("--online",type=bool, default=False, help=" online or offline mode")
+    parser.add_argument("--report_name",type=str, default="pdf-amisr-report.pdf", help="name pdf file")
+
+    parser.add_argument("--read_write",type=str, default="read", help="read or write ")
+    parser.add_argument("--online",default=False,action='store_true', help=" online or offline mode")
     parser.add_argument("--startDate",type=str, default=None, help="Date DD/MM/YYYY")
     parser.add_argument("--endDate",type=str, default=None, help="Date DD/MM/YYYY")
-    parser.add_argument("--interval",type=int, default='60', help="plot interval")
-    parser.add_argument("--interval_alarm",type=int, default='6', help="plot interval for alarm")
+    parser.add_argument("--interval",type=int, default='1', help="plot interval")
+    parser.add_argument("--interval_alarm",type=int, default='1', help="plot interval for alarm")
     parser.add_argument("--host",type=str, default='10.10.40.121', help="IP server xml")
     parser.add_argument("--user",type=str, default='umetops', help="user")
     parser.add_argument("--password",type=str, default='amisr beam scan', help="password")
     parser.add_argument("--xml_path",type=str, default='/data/amisr/array/status/', help="path to data")
     parser.add_argument("--key_path",type=str, default=None, help="path to key")
 
-    parser.add_argument("--period_online",type=int, default=None, help="period to check status in seconds")
+    parser.add_argument("--period_online",type=int, default=0, help="period to check status in seconds")
     parser.add_argument("--email_sender",type=str, default=None, help="email sender")
     parser.add_argument("--email_password",type=str, default=None, help="password sender")
     parser.add_argument("--email_cc1",type=str, default=None, help="copy msg")
@@ -253,12 +281,18 @@ if __name__ == '__main__':
     parser.add_argument("--email_dest",type=str, default=None, help="main recipient")
     parser.add_argument("--power_alert",type=int, default=150, help="minimum power to send alert")
 
-    parser.add_argument("--check_last_date",type=bool, default=False, help="show last dates of database files")
+    parser.add_argument("--check_last_date", default=False, help="show last dates of database files",action='store_true')
 
-    parser.add_argument("--add_tables",type=bool, default=True, help="tables of status per panel")
+    parser.add_argument("--panels_list", default="all", type=str, help="list of panles to consider, from 1 to 14")
+    parser.add_argument("--filter_points",type=int, default=8000, help="points for the fiter IRQ ")
+
+
+    parser.add_argument("--add_tables",type=bool, default=True,help="tables of status per panel")
     parser.add_argument("--add_pie",type=bool, default=True, help="page of pie charts")
     parser.add_argument("--add_panels",type=bool, default=True, help="pages of panels")
     parser.add_argument("--dataType",type=str, default="power", help="data type read for processing")
-    kwargs = parser.parse_args()
+    parser.add_argument("--no_removeOutliers", default=False, action='store_true', help="filter outliers")
 
+    kwargs = parser.parse_args()
+    ##print(kwargs)
     main(kwargs)

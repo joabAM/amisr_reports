@@ -24,10 +24,10 @@ table_type={
 text_stats ="""<font size="12"><p>The following graph shows the variation in the amount
 of AEU transmitting in a power interval, which goes from the value shown in the title
 to the previous lower value, except for level 0 and greater than 500 watts; these amounts and
-variations are presented with the panels involved. The graphs on the right show the
-total amount of AEU in said interval with its evolution over time (hours)</p>"""
+variations are presented with the panels involved. The graphs on the right show the total
+amount of AEU in that interval with its evolution over time (hours) without any data filtering.</p>"""
 
-text_correlation = """<font size="12"><p>The correlation graph between the power
+text_correlation = """<font size="12"><p>The correlation graph between the pow
 intervals shows the AEU exchange between different power levels, that is, it is
 possible to know which power levels are more likely to increase others. For the
 particular interest of AMISR-14, it is observed that the faulty AEUs (= 0 watts)
@@ -62,9 +62,8 @@ The antenna array has been oriented North-South to obtain a greater pointing wid
 in the East-West direction.\n The following graphs show the performance of the radar since
 {} to {}</p>"""
 text_alarm_one="""<font size=12></p>The following graph shows the VSWR alarms produced during
-the operation of AMISR in the selected period; the VSWR alarm maight have been asociated to the failure
-in the AMISR Antenna Element Units (AEU), since during the event in november 2020, the radar
-showed multiple alarms simultaneously in all panels.
+the operation of AMISR in the selected period; the VSWR alarm may be asociated to the failure
+in the AMISR Antenna Element Units (AEU).
 </p>
 """
 text_fail_rate1="""<font size=12></p>The failure rate of the AMISR-14 radar throughout the hours
@@ -75,11 +74,9 @@ a small number, so the hours/AEU has been displayed in the overview box instead.
 """
 text_fail_rate2="""<font size=12></p>The following table shows the failure rate for each panel. These
 numbers are higher than the general rate because the number of failures is lower if only one panel is
-considered. However, if the amounts are added inversely, the same value would be obtained. than the
-inverse of the general rate. The table is mainly referential, to see the behavior of each panel, a low
-quantity indicates the panel has a higher failure rate.
-</p>
-"""
+considered. However, if the amounts are added inversely, the same value would be obtained as the inverse
+of the general rate. The table is mainly referential, to see the behavior of each panel, the lower limit
+has been constrained to 0, and the upper limit is constrained to 10000 h/aeu. </p>"""
 class Report():
 
     pdf = None
@@ -88,7 +85,8 @@ class Report():
     img = None
     username = "Joab Apaza"
 
-    def __init__(self, start, end, username=username):
+    def __init__(self, start, end, username=username, filename="report.pdf"):
+        self.pdf_file_name = filename
         self.work_path = os.getcwd()
         self.path_amisr_img = self.work_path+"/images/AMISR_rain.png"
         self.username = username
@@ -147,7 +145,7 @@ class Report():
         pass
 
     def add_intervals(self,figure):
-        print("creating stats image...")
+        print("\nCreating interval image...")
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=18)
         text = "AMISR by power output intervals"
@@ -159,10 +157,11 @@ class Report():
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
 
         self.pdf.image(img, x=10, y=60, h=3.4*(self.pdf.eph/4), w=3.8*(self.pdf.epw)/4)
+        print("Interval image done")
 
-        return
 
     def add_correlation(self,figure):
+        print("\nCreating Correlation figure...")
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=18)
         text = "Cross correlation between power output intervals"
@@ -171,16 +170,19 @@ class Report():
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
         self.pdf.image(img, x=60, y=65, h=100, w=100)
-        text="""<font size="12"><p>The previous figure is symmetrical with respect to its diagonal, based
-on the repairs carried out on the radar, it has been observed that AEUs that drop to half their power, or
-between 100 to 300 watts correspond in most cases to the fault of the Q1 and Q2 preamps (shown in the
-following figure)</p>"""
+        text="""<font size="12"><p>The previous figure is symmetrical with respect to its
+diagonal, based on the repairs carried out on the radar, it has been observed that the AEUs
+drop to half their power, or between 100 and 300 watts correspond in most cases due to the
+preamplifiers Q1 and Q2 (shown in the following figure). The common fault is due to the
+short of Q3. And it is rarely necessary to replace the Q5 and Q6.</p>"""
         self.pdf.set_xy(10,170)
         self.pdf.write_html(text)
         path = self.work_path+"/images/AMISR_SSPA.jpg"
         self.pdf.image(path, x=30, y=200, h=80, w=150)
+        print("Correlation figure done")
 
     def add_pie(self, figures, values):
+        print("\nCreating pie figure...")
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=16)
         text = "Repairment Status AMISR-14"
@@ -215,8 +217,10 @@ failed  {} ({:.1f}%) AEU depending of the failure in November 20.</p>""".format(
         self.pdf.image(img2, x=30, y=190, h=80, w=160)
         self.pdf.set_xy(10,170)
         self.pdf.write_html(text2)
+        print("Pie figure done")
 
     def print_overview(self,table, power, power_figure):
+        print("\ncreating Overview...")
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=18)
         text = "Overview of AMISR-14 working status"
@@ -237,8 +241,10 @@ failed  {} ({:.1f}%) AEU depending of the failure in November 20.</p>""".format(
 is taken into account, this varies with the power that the radar observes. This can be seen in the
 following graph, where the blue line is the one obtained by adding all the AEUs.</p>"""
         self.pdf.write_html(text)
+        print("Overview done")
 
     def add_alarm(self,figure, values):
+        print("\nCreating General Alarm figure...")
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=18)
         text = "VSWR Alarms"
@@ -248,14 +254,23 @@ following graph, where the blue line is the one obtained by adding all the AEUs.
 
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
-        self.pdf.image(img, x=30, y=50, h=120, w=180)
+        self.pdf.image(img, x=10, y=40, h=120, w=210)
 
-        figure2 = values
-        data = np.fromstring(figure2.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-        img = Image.frombytes('RGB', figure2.canvas.get_width_height(),data)
-        self.pdf.image(img, x=50, y=180, h=80, w=120)
+
+
+        if values != None:
+            self.pdf.set_xy(10,160)
+            text="""<font size="12"><p>Cumulative alarm events over time.</p>"""
+            self.pdf.write_html(text)
+
+            figure2 = values
+            data = np.fromstring(figure2.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+            img = Image.frombytes('RGB', figure2.canvas.get_width_height(),data)
+            self.pdf.image(img, x=10, y=180, h=100, w=190)
+        print("General Alarm done")
 
     def print_rates(self, fig_rate, table_rate, rates):
+        print("\nCreating Rates figures...")
         self.pdf.add_page()
         self.pdf.set_font("Times", "B", size=18)
         text = "AMISR fail rates"
@@ -275,6 +290,8 @@ following graph, where the blue line is the one obtained by adding all the AEUs.
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
         self.pdf.image(img, x=10, y=185, h=40, w=self.pdf.epw/1.1)
+        print("Rate figures done")
+
 
     def print_panel(self, fig_total, fig_aeu, fig_rate, rate, label ):
 
@@ -310,6 +327,39 @@ shown in the graph bellow:</p>""".format(label)
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
         self.pdf.image(img, x=20, y=180, h=100, w=150)
 
+    def print_panel2(self, fig_alarm, fig_temp, tabla_html1, tabla_html2):
+
+        self.pdf.add_page()
+
+        self.pdf.set_xy(10,10)
+        text="""<font size="12"><p> Historical VSWR alarm for the panel</p>"""
+        self.pdf.write_html(text)
+
+        figure = fig_alarm
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=10, y=20, h=120, w=220)
+
+
+        self.pdf.set_xy(10,150)
+        text="""<font size="12"><p> Historical SSPA temperature of the panel</p>"""
+        self.pdf.write_html(text)
+
+        figure = fig_temp
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=10, y=160, h=120, w=180)
+
+        '''
+        self.pdf.set_xy(10,160)
+        text="""<font size="12"><p>A ge</p>""".format(label)
+        self.pdf.write_html(text)
+        figure = fig_aeu
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=20, y=180, h=100, w=150)
+        '''
+
     def print_panel_detail(self, panel_text):
         self.pdf.add_page(orientation='L')
         self.pdf.set_font("Times", "B", size=18)
@@ -326,5 +376,5 @@ shown in the graph bellow:</p>""".format(label)
 
 
     def getReport(self):
-        self.pdf.output("pdf-amisr-report.pdf")
+        self.pdf.output(self.pdf_file_name)
         return

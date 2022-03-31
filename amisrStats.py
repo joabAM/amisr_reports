@@ -32,7 +32,7 @@ class STATS_AMISR():
     enddate = None
 
 
-    def __init__(self,type="power", data=None, navg=1):
+    def __init__(self,type="power", data=None, navg=1, no_filt=False, panels="all"):
         if data == None:
             return
         self.data = pd.DataFrame(data, dtype='int32')
@@ -41,22 +41,34 @@ class STATS_AMISR():
         self.work_path = os.getcwd()
         if dataType == 1:
             self.labels = pd.read_csv(self.work_path+"/labels-power.csv")
+            self.data.columns = self.labels.columns #etiquetas para cada columna
             self.start_idx = 10
         elif dataType ==2:
-            print("tipo 2")
+            #print("loading default")
+            self.labels = pd.read_csv(self.work_path+"/labels-default.csv")
+            self.data.columns = self.labels.columns #etiquetas para cada columna
             self.start_idx = 2
         else:
-            print("ninguno")
+            self.labels = pd.read_csv(self.work_path+"/labels-default.csv")
+            self.data.columns = self.labels.columns #etiquetas para cada columna
+            self.start_idx = 2
+            #print("Data type: ",type)
+        if panels=="all":
+            self.panels_list = [1,2,3,4,5,6,7,8,9,10,11,12,13,14]
+        else:
+            self.panels_list = [int(i) for i in panels.split(",")]
 
-        self.data.columns = self.labels.columns #etiquetas para cada columna
-        aux = self.data.iloc[:,0:2].astype(str) #date and time
-        self.data = self.data.apply(pd.to_numeric, errors='coerce')
-        date_time = aux.date +" "+aux.time
-        self.data.iloc[:,0] = pd.to_datetime(date_time,format="%Y-%m-%d %H:%M:%S") #regresa hora y fecha
+
+        self.data = fix_dataframe_date(self.data)
         self.nAvg = navg
         self.rMant = pd.read_csv(self.work_path+"/Registro_matenimiento.csv")
         self.startdate = self.data.iloc[0,0].date()
         self.enddate = self.data.iloc[-1,0].date()
+
+        self.removeOutliers = False
+        if not no_filt:
+            self.removeOutliers = True
+
         #print(self.data.dtypes)
 
 
@@ -204,6 +216,7 @@ class STATS_AMISR():
                 j[i] = i*7+off
 
             aux = self.getData(data,j)
+            #print(aux)
             self.df_tx_npows.append(aux)
         df_filt = pd.DataFrame()
 
@@ -224,6 +237,8 @@ class STATS_AMISR():
                 m += 1
             df_filt = signal.medfilt(df.sum(axis=1).to_numpy(),59 ) #datos filtrados ahora en horas
             df_filt = pd.DataFrame(df_filt)
+
+
             df_filt.columns=['data_filt']
             x_hours = np.linspace(0,(len(df_filt)/60),len(df_filt))
             df_filt['hours']    =   x_hours
@@ -259,6 +274,7 @@ class STATS_AMISR():
             df_plt.index = xlabel
             df_plt = df_plt.apply(np.ceil)
             df_plt.plot.bar(ax=axes[r,0], grid=True,stacked=True,title=title)
+            #print(df_filt)
 
             title="{} watts over TX/RX minutes".format(label_watts[0][6:])
             df_filt.plot(x='hours', y=label_watts[0][6:],ax=axes[r,1],grid=True,title=title)
@@ -296,20 +312,86 @@ class STATS_AMISR():
         fig.canvas.draw()
         return fig
 
-    def getRateFig(self, which, general=False, panel=None, fig=True):
+    def check_Outlier(self, data, points = 8000):
+
+
+        Npoints=points
+        if not self.removeOutliers:
+            return data
+
+        index = data.index
+        data.reset_index(inplace=True, drop=True)
+        n = len(data)
+        p = n / Npoints
+        r = n % Npoints
+        start = 0
+        for block in range(int(math.ceil(p))):
+
+            end = (start+points)
+            s = data[start:end].copy()
+            #print(p,r,med)
+            q1 = s.quantile(.25)
+            q3 = s.quantile(.75)
+            irq = q3 - q1
+            lower = q1 - irq
+            higher = q3 + irq
+            # lower = med - 4
+            # higher = med + 4
+
+            s.mask((s > higher),higher, inplace=True)
+            s.mask((s < lower),lower, inplace=True)
+
+            data.iloc[start:end] = s.iloc[:]
+            start = end
+
+        if r != 0 :
+            s = data[-r:].copy()
+
+            q1 = s.quantile(.25)
+            q3 = s.quantile(.75)
+            irq = q3 - q1
+            lower = q1 - irq
+            higher = q3 + irq
+
+            s.mask((s > higher),higher, inplace=True)
+            s.mask((s < lower),lower, inplace=True)
+            data.iloc[-r:] = s.iloc[:]
+
+        data.index = index
+        return data
+
+    def getRateFig(self, which, general=False, panel=None, fig=True, filter_points=5000):
         data, y_pred, rate = None, None, None
         #data = self.data_npow.iloc[:,0]
         data = pd.DataFrame(self.df_tx_npows[0])
+        panels_labels = []
+
+        #print(self.panels_list)
         if general:
-            data = data.sum(axis=1)
-            fig_title = "AMISR-14 Radar fail rate"
+            #print(data)
+            #print(data.columns)
+            if len(self.panels_list) == 14:
+                data = data.sum(axis=1)
+            else:
+                for p in self.panels_list:
+                    r,c = panel_to_rc(p)
+                    panels_labels.append("R0{}-C{}=0".format(r,c))
+                data = data[panels_labels].sum(axis=1)
+
+            data = pd.Series(signal.medfilt(data.to_numpy(),59 )) #datos filtrados ahora en reduce ruido
+            data = self.check_Outlier(data, points=filter_points)
+            fig_title = "AMISR-14 radar fail rate"
+
         else:
             data = data.iloc[:,(panel-1)]
+            data = pd.Series(signal.medfilt(data.to_numpy(),59 )) #datos filtrados ahora en reduce ruido
+            data = self.check_Outlier(data,points=filter_points)
             r,c = panel_to_rc(panel)
             fig_title = "Panel R0{}-C{} fail rate".format(r,c)
 
-        data = pd.Series(signal.medfilt(data.to_numpy(),59 )) #datos filtrados ahora en reduce ruido
+
         data = data.reset_index(drop=True)
+
 
         if which=="cero":
             #y_pred, rate = get_rate(data)
@@ -478,7 +560,7 @@ class STATS_AMISR():
         return fig
 
 
-    def getPlotPanels(self, DataType="power", panels_list=None, interval=30):
+    def getPlotPanels(self, DataType="power", panels_list=None, interval=30, other_data=None):
         panels_plot_list = []
         if panels_list ==None:
             panels_plot_list = [[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],
@@ -493,15 +575,20 @@ class STATS_AMISR():
         panels_number = [rc_to_panel(x[0],x[1]) for x in panels_plot_list]
 
         for panel in panels_number:
-            fig1 = self.plotAEU(panel, avg=interval,sum=True) #panel
-            fig2 = self.plotAEU(panel, avg=interval) #AEUs
-            figures.append([fig1,fig2])
+
+            fig2 = self.plotAEU(panel, avg=interval,other_data=other_data, dataType=DataType) #AEUs
+
+            if DataType=="power" or DataType=="current":
+                fig1 = self.plotAEU(panel, avg=interval,sum=True) #panel
+                figures.append([fig1,fig2])
+            else:
+                figures.append(fig2)
 
         return figures, panel_label_list
 
 
 
-    def plotAEU(self, panel_nro, plot_list=None, plot_range=None, avg=30,sum=False):
+    def plotAEU(self, panel_nro, plot_list=None, plot_range=None, avg=30,sum=False,other_data=None, dataType="power"):
         '''
         panel nro = 1 al 14
         plot_list = 1 al 32, solo lo indicado en la lista
@@ -532,6 +619,7 @@ class STATS_AMISR():
         '''
         y_aeu -> [time_prom][panel]
         '''
+
         start_ind = (panel_nro - 1)* 32 + self.start_idx
 
         y_aeus = self.data.iloc[:,start_ind:(start_ind+32)]
@@ -541,7 +629,7 @@ class STATS_AMISR():
         #print(y_aeus)
         if sum:
             y_aeus = y_aeus.mean(axis=1)
-            y_aeus.plot(ax=ax, label="power")
+            y_aeus.plot(ax=ax, label=dataType)
             #ax.legend(bbox_to_anchor=(-0.06,1), loc="right", fontsize = "x-small", title = "legend")
         else:
             y_aeus.columns = aeu_label_list
@@ -550,7 +638,7 @@ class STATS_AMISR():
                 ax.legend(bbox_to_anchor=(-0.06,1), loc="upper right", fontsize = "x-small", title = "legend")
 
         #ax.set_xlabel('dates',  fontsize=18)
-        ax.set_ylabel("power",fontsize=18)
+        ax.set_ylabel(dataType,fontsize=18)
         ax.set_title("Panel R0{}-C{}".format(r,c), fontsize=20)
 
 
@@ -567,7 +655,7 @@ class STATS_AMISR():
 
     def getPlotsAlarms(self,aeu_alarms,type="VSWR",minAEU=1,maxAEU=448):
 
-        data = aeu_alarms
+        data = aeu_alarms.copy()
 
         data.index = [ datetime.datetime.strptime(x,"%Y-%m-%d %H:%M")- datetime.timedelta(hours=5) for x in data.index]
 
@@ -586,7 +674,7 @@ class STATS_AMISR():
         plt.yticks(np.arange(0,(maxAEU-minAEU)+1, dtype=np.int),ylabel_aeu)
 
         ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-        ax.yaxis.set_major_locator(plt.MaxNLocator(30))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(32))
 
         plt.autoscale(enable=True, axis='x', tight=False)
 
@@ -607,39 +695,30 @@ class STATS_AMISR():
 
     def getPlotsAlarmRate(self,aeu_alarms,type="VSWR",minAEU=1,maxAEU=448):
 
-        data = aeu_alarms
+        data = aeu_alarms.copy()
 
         #data.index = [ datetime.datetime.strptime(x,"%Y-%m-%d %H:%M")- datetime.timedelta(hours=5) for x in data.index]
         leng = len(data)
         minAEU = minAEU
         maxAEU = maxAEU
-        data_status = data.iloc[:,minAEU-1:maxAEU].to_numpy(dtype='float32')
-        data_status = np.transpose(data_status)
+        data_status = data.iloc[:,minAEU-1:maxAEU]#.to_numpy(dtype='float32')
+        #print(data_status)
+
         data_status_acum = data_status.sum(axis=1)
-
-        data_status_acum = pd.DataFrame(data_status_acum)
-        data_status_acum = data_status_acum.where(data_status_acum<(leng/3),0)
-        data_rate = pd.DataFrame(self.df_tx_npows[0])
-        data_rate = data_rate.sum(axis=1)
-        fig_title = "AMISR-14 Radar fail rate"
-
-        data_rate = pd.Series(signal.medfilt(data_rate.to_numpy(),59 )) #datos filtrados ahora en reduce ruido
-        data_rate = data_rate.reset_index(drop=True)
-
+        fig_title = "AMISR-14 Radar alarms quantity"
 
         fig_s, ax = plt.subplots()
-        fig_s.set_size_inches(20, 8)
-        ax_2 = ax.twinx()
+        #fig_s.set_size_inches(20, 8)
 
-        data_status_acum.plot.bar(ax=ax, label="alarms")
-        data_rate.plot(ax=ax_2,color='r', label="rates")
+        data_status_acum.plot(ax=ax, label="alarms")
 
-        #ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-        #ax.yaxis.set_major_locator(plt.MaxNLocator(30))
-
-        #plt.autoscale(enable=True, axis='x', tight=False)
-        plt.grid()
-        plt.legend()
+        plt.xticks(np.arange(1,len(data)+1, dtype=np.int),data.index,rotation=60)
+        ax.xaxis.set_major_locator(plt.MaxNLocator(20))
+        # #ax.yaxis.set_major_locator(plt.MaxNLocator(30))
+        #
+        # #plt.autoscale(enable=True, axis='x', tight=False)
+        # plt.grid()
+        # plt.legend()
         plt.tight_layout()
         fig_s.canvas.draw()
         return fig_s

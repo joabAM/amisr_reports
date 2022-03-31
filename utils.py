@@ -1,9 +1,10 @@
 from scipy.optimize import curve_fit
 import numpy as np
 import math
+import pandas as pd
 
 def decodeDataType(dataTypeStr):
-    dictDataType = {"power":1, "current":2, "alarm":3, "temperature1":41,"temperature2":41,
+    dictDataType = {"power":1, "current":2, "alarm":3, "temperature1":41,"temperature2":42,
                     "SSPA volts":5, "volts dir":6, "volts rev":7,
                     "-8 volts":8
                     }
@@ -25,6 +26,16 @@ def encodeAlarm(typeInt):
     dictaAlarm={1:"temp", 2:"vswr", 3:"sum"}
 
     return dictaAlarm[typeInt]
+
+def fix_dataframe_date(dataframe):
+
+
+    aux = dataframe.iloc[:,0:2].astype(str) #date and time
+    fix_dataframe = dataframe.apply(pd.to_numeric, errors='coerce')
+    date_time = aux.date +" "+aux.time
+    fix_dataframe.iloc[:,0] = pd.to_datetime(date_time,format="%Y-%m-%d %H:%M:%S") #regresa hora y fecha
+
+    return fix_dataframe
 
 '''
 Numeración de Paneles 1 al 14

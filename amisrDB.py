@@ -66,7 +66,7 @@ class DB_AMISR ():
     aeus_plot_range = []
 
     def __init__(self,xmlPath,bz2Path,dataBasePath,hostname, username,
-                password, key_file=None,online=False, period=None, email_1=None,
+                password,online=False, key_file=None, period=900, email_1=None,
                 email_2=None,email_3=None,email_sender=None,email_pass=None,limit_alert=150):
 
         self.xmlPath = xmlPath
@@ -132,10 +132,13 @@ class DB_AMISR ():
         source = self.xmlPath+str(s_year)+'/'+str(s_doy).zfill(3)+'/'
         #print("buscando: ...", source)
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(hostname=self.hostname, port=22, username=self.username, key_filename=self.key, password=self.password)
-        sftp_client = client.open_sftp()
 
+        #client.load_system_host_keys()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        client.connect(self.hostname, port=22, username=self.username, password=self.password, key_filename=self.key)
+
+        sftp_client = client.open_sftp()
         if len(os.listdir(self.bz2path)) != 0:
             #print("Cleanning b2z dir...")
             files = glob.glob(self.bz2path+"*")
@@ -157,7 +160,7 @@ class DB_AMISR ():
             else:
                 return
         for remote_file in remote_files_list:
-            print("getting ",(source+remote_file) )
+            #print("getting ",(source+remote_file) )
             sftp_client.get(source+remote_file,  self.bz2path+remote_file)
         sftp_client.close()
 
@@ -168,7 +171,7 @@ class DB_AMISR ():
             if filebz2.endswith(".bz2"):
                 self.decompress(self.bz2path + filebz2)
                 os.remove(self.bz2path + filebz2)
-
+        #client.close()
 
     def decompress(self, path):
         try:
@@ -350,14 +353,10 @@ class DB_AMISR ():
                     data = [date_toWrite, time_toWrite] +  Amperes
                 elif self.DataType == 3:
                     data = [date_toWrite, time_toWrite] +  Alarms
-                elif self.DataType == 4:
-                    if temperatureType == 1:
-                        data = [date_toWrite, time_toWrite] + SSPA_temp
-                    elif temperatureType == 2:
-                        data = [date_toWrite, time_toWrite] + Contr_temp
-                    else:
-                        print("ERROR invalid temperatureType")
-                        return
+                elif self.DataType == 41:
+                    data = [date_toWrite, time_toWrite] + SSPA_temp
+                elif temperatureType == 42:
+                    data = [date_toWrite, time_toWrite] + Contr_temp
                 elif self.DataType == 5:
                     data = [date_toWrite, time_toWrite] + SSPA_Volts
                 elif self.DataType == 6:
@@ -401,7 +400,7 @@ class DB_AMISR ():
 
 
 
-        if self.online == 0:  #ie offline
+        if self.online == False:  #ie offline
             dataType =  decodeDataType(dataType)
             self.definePath(dataType)
             self.startdate = startdate
@@ -424,8 +423,9 @@ class DB_AMISR ():
                     #print("trying ", doy_)
                     self.find_new_bz2(int(date_.year), int(doy_))
 
-                except:
-                    print("Searching valid files... year: {} doy: {}".format(int(date_.year),int(doy_)))
+                except Exception as e:
+                    print("Error {} year: {} doy: {}".format(e, int(date_.year),int(doy_)))
+                    print("Searching valid files... ")
 
                 self.read_xml()
                 #print("Date:", year_, doy_)
@@ -494,7 +494,14 @@ class DB_AMISR ():
                 if not self.check_last_date:
                     print(s_date, e_date)
                 s_date = datetime.datetime.strptime(s_date,"%Y-%m-%d").date()
-                e_date = datetime.datetime.strptime(e_date,"%Y-%m-%d").date() + datetime.timedelta(days=1)
+                e_date = datetime.datetime.strptime(e_date,"%Y-%m-%d").date()
+
+                if s_date > e_date:
+                    print("Final date must be higher thar initial date!!!...")
+                    os._exit(os.EX_IOERR)
+
+                if s_date == e_date:
+                    e_date += datetime.timedelta(days=1)
                 day_date = s_date
 
 
@@ -553,29 +560,33 @@ class DB_AMISR ():
                 return day_lines
 
 
-
-
-
-
         else:
             print("There is no data")
 
+
     def run_online(self):
         msg_sended = 1
+        time.sleep(120)
         while True:
+
             self.writeDB(None, None, None)
             if self.curret_amisr_status[5] < self.power_limit_alert:
-                print("Sending alert!!!...")
-                self.send_alert(self.curret_amisr_status,self.curr_day)
+                print("Power bellow limit...")
                 msg_sended +=1
 
             print("\n",self.labels_status_gnral)
             print(self.curret_amisr_status)
 
             time.sleep(self.period_online)
-            if msg_sended > 3:
+
+            if msg_sended > 5:
                 print("Online monitoring finished...")
                 break
+
+            if msg_sended > 3:
+                print("Sending alert!!!... status:{} under limit:{}".format(self.curret_amisr_status[5],self.power_limit_alert))
+                self.send_alert(self.curret_amisr_status,self.curr_day)
+
 
 
     def send_alert(self,power_status, datetime):
