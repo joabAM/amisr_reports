@@ -7,7 +7,7 @@
 import datetime
 import time
 import matplotlib.dates as mdates
-
+import sys
 import os,glob,stat
 import os.path
 import bz2
@@ -355,7 +355,7 @@ class DB_AMISR ():
                     data = [date_toWrite, time_toWrite] +  Alarms
                 elif self.DataType == 41:
                     data = [date_toWrite, time_toWrite] + SSPA_temp
-                elif temperatureType == 42:
+                elif self.DataType == 42:
                     data = [date_toWrite, time_toWrite] + Contr_temp
                 elif self.DataType == 5:
                     data = [date_toWrite, time_toWrite] + SSPA_Volts
@@ -398,14 +398,14 @@ class DB_AMISR ():
 
     def writeDB(self, startdate, enddate, dataType):
 
-
+        str_type = dataType
 
         if self.online == False:  #ie offline
             dataType =  decodeDataType(dataType)
             self.definePath(dataType)
             self.startdate = startdate
             self.enddate = enddate
-
+            print("Writting {}...".format(str_type))
             startdate_ = datetime.datetime.strptime(startdate,"%Y/%m/%d").date()
             enddate_ = datetime.datetime.strptime(enddate,"%Y/%m/%d").date()
             print("Offline from: ", startdate_, "to: ",enddate_)
@@ -445,7 +445,7 @@ class DB_AMISR ():
 
 
 
-    def readDB(self,dataType, start_plot_date,end_plot_date, aeuStatus = False,read_interval="0.5", alarmType="none"):
+    def readDB(self,dataType, start_plot_date,end_plot_date, aeuStatus = False,read_interval="0.1", alarmType="none"):
         strdata = dataType
         dataType =  decodeDataType(dataType)
         self.definePath(dataType)
@@ -466,7 +466,7 @@ class DB_AMISR ():
             interval = 1
 
         if not self.check_last_date:
-            print("data Prom {}: {:2d} min".format(strdata, int(interval)))
+            print("Data {} ".format(strdata))
 
 
         startIndex = 2 # primeros 2 son hora
@@ -550,12 +550,17 @@ class DB_AMISR ():
             if self.check_last_date:
                 return date             #retorna la ultima fecha
 
+
+
             if aeuStatus:
                 aeu_alarms.set_index(0, inplace=True)
                 #print(aeu_alarms)
                 return aeu_alarms
 
             else:
+                if len(day_lines) < 1:
+                    print("Error, there is no data for those dates... Data type: ",strdata)
+                    sys.exit()
 
                 return day_lines
 
@@ -565,34 +570,73 @@ class DB_AMISR ():
 
 
     def run_online(self):
-        msg_sended = 1
+        '''
+
+        good    numtx   bad     ugly    rf      peak    total   numrx
+        0       1       2       3       4       5       6       7
+        '''
+        msg_sended = 0
         time.sleep(120)
+        limit_timer = self.period_online
+        flag_bellow_power = False
+        flag_radar_on = False
+        flag_rf_on = False
         while True:
 
             self.writeDB(None, None, None)
+
+            if (self.curret_amisr_status[1] > 200):
+                flag_radar_on = True
+            else:
+                flag_radar_on = False
+
+            if (self.curret_amisr_status[4] > 0): #toma 0 o 1
+                flag_rf_on = True
+            else:
+                flag_rf_on = False
+
+
+            if flag_bellow_power and (self.curret_amisr_status[5] > self.power_limit_alert):
+                msg_sended = 0
+                limit_timer = self.period_online
+                flag_bellow_power = False
+
             if self.curret_amisr_status[5] < self.power_limit_alert:
+                flag_bellow_power = True
                 print("Power bellow limit...")
                 msg_sended +=1
+                if limit_timer == 300:
+                    limit_timer = 120   #se espera 2 min
+                else:
+                    limit_timer = 300    #se cambia a esperar solo 5 min para la proxima revision
 
             print("\n",self.labels_status_gnral)
             print(self.curret_amisr_status)
 
-            time.sleep(self.period_online)
+            time.sleep(limit_timer)
+
 
             if msg_sended > 5:
                 print("Online monitoring finished...")
                 break
 
-            if msg_sended > 3:
+            if flag_radar_on and (msg_sended > 3) and  flag_rf_on: #baja potencia, con AEU en tx/rx
                 print("Sending alert!!!... status:{} under limit:{}".format(self.curret_amisr_status[5],self.power_limit_alert))
-                self.send_alert(self.curret_amisr_status,self.curr_day)
+                self.send_alert(self.curret_amisr_status,self.curr_day, "power")
+
+            if flag_radar_on and (msg_sended > 3) and not flag_rf_on: # sin rf, con AEU en tx/rx
+                print("Sending alert!!!... status rf:{} , no RF signal".format(flag_rf_on))
+                self.send_alert(self.curret_amisr_status,self.curr_day, "rf")
 
 
-
-    def send_alert(self,power_status, datetime):
+    def send_alert(self,power_status, datetime, type):
 
         dest_mail = self.email_recipients
-        message = 'Drop in AMISR Power, transmiting with '+ str(power_status[5]/1000)+ ' KWatts\n'
+        message = ""
+        if type=="power":
+            message = 'Drop in AMISR Power, transmiting with '+ str(power_status[5]/1000)+ ' KWatts\n'
+        elif type =="rf":
+            message = 'No RF signal input!!! '
 
         subject = 'AMISR-14 POWER ALERT'
         str1 = ' \t'.join(self.labels_status_gnral )
@@ -609,7 +653,7 @@ class DB_AMISR ():
 
     def last_database_dates(self):
         self.check_last_date = True
-        data_types=[1,2,3,41,42,5,6,7]
+        data_types=[1,2,3,41,42,5,6,7,8]
         for dataTypeInt in data_types:
             self.definePath(dataTypeInt)
             try:

@@ -5,7 +5,7 @@ from amisrStats import *
 from report import Report
 import argparse
 import os
-
+from utils import *
 
 online = False # True or False 1 o 0
 # startdate = '2021/08/15'  #formato yyyy/mm/dd para offline
@@ -48,12 +48,13 @@ plot_interval = 0.5
 curr_path = os.getcwd()
 dataBasePath = curr_path+"/dataBase/"
 bz2path = curr_path+"/bz2dir/"
-
+typesData = ["power", "current", "alarm", "SSPA volts", "volts dir", "volts rev","-8 volts"]
 
 def main(kwargs):
     keys = vars(kwargs)
 
     report_name = keys.get("report_name")
+    author = keys.get("author")
 
     online = keys.get("online")
     flag_R_W = keys.get("read_write")
@@ -85,6 +86,8 @@ def main(kwargs):
     flag_add_pie = keys.get("add_pie")
     flag_add_panels = keys.get("add_panels")
     panel_list = keys.get("panels_list")
+
+
     print("")
 
 
@@ -105,23 +108,39 @@ def main(kwargs):
 
     else:
         if flag_R_W=="write":
-            dbObj.writeDB(startdate, enddate, dataType) #escribir base de datos
+            if dataType == "all":
+                for type in typesData:
+                    dbObj.writeDB(startdate, enddate, type) #escribir base de datos
+            else:
+                dbObj.writeDB(startdate, enddate, dataType) #escribir base de datos
 
         else: #then is "read"
 
-            DataDB = dbObj.readDB(dataType,startdate,enddate) #objeto con información en Pandas DataFrame
+            DataDB = dbObj.readDB("power",startdate,enddate) #objeto con información en Pandas DataFrame
             # """Objeto para lectura de datos de gráficos antiguos"""
             #
 
             #lectura de ALARMA, solo vswr, retorna data y date
 
-            DataAlarm = dbObj.readDB("alarm",startdate,enddate,aeuStatus = True,read_interval=interval_a ,alarmType="vswr")
-            Data_tempSSPA = dbObj.readDB("temperature1",startdate,enddate)
+            DataAlarm = dbObj.readDB("alarm",startdate,enddate,aeuStatus = True,read_interval=0.1 ,alarmType="vswr")
+            #Data_tempSSPA = dbObj.readDB("temperature1",startdate,enddate)
+            Data_M8volts = dbObj.readDB("-8 volts",startdate,enddate)
+            Data_SSPAvolts = dbObj.readDB("SSPA volts",startdate,enddate)
+            Data_DIRvolts = dbObj.readDB("volts dir",startdate,enddate)
+            Data_REVvolts = dbObj.readDB("volts rev",startdate,enddate)
+
 
             stats = STATS_AMISR(type="power", data=DataDB, no_filt=noFilterOutliers, panels=panel_list)
 
-            stats_temp = STATS_AMISR(type="temperature1", data=Data_tempSSPA, no_filt=True, panels=panel_list)
-            #
+            #stats_temp = STATS_AMISR(type="temperature1", data=Data_tempSSPA, no_filt=True, panels=panel_list)
+            stats_m8volts = STATS_AMISR(type="-8 volts", data=Data_M8volts, no_filt=True, panels=panel_list)
+
+            stats_SSPAvolts = STATS_AMISR(type="SSPA volts", data=Data_SSPAvolts, no_filt=True, panels=panel_list)
+
+            stats_DIRvolts = STATS_AMISR(type="volts dir", data=Data_DIRvolts, no_filt=True, panels=panel_list)
+
+            stats_REVvolts = STATS_AMISR(type="volts rev", data=Data_REVvolts, no_filt=True, panels=panel_list)
+
             # #plotObj2 = Plot_amisrDB("alarm") #antig{uo ploteo}
             #
             # """show_plot = [1, 0, 0, 0] primero solo potencia general"""
@@ -129,7 +148,7 @@ def main(kwargs):
 
 
 
-            report = Report(stats.startdate,stats.enddate, filename=report_name)   #clase pdf report
+            report = Report(stats.startdate,stats.enddate, username =author, filename=report_name)   #clase pdf report
 
 
             stats.updateNPows() # para getStatsTx y correlation
@@ -162,8 +181,13 @@ def main(kwargs):
                 panel_alarms_vswr.append(stats.getPlotsAlarms(DataAlarm,minAEU=min_aeu,maxAEU=max_aeu))
 
 
-            fig_panels,labels_list = stats.getPlotPanels("power", interval=60) #una hora, y sin especificar lista para obtener todos
-            fig_panels_temp, labels_list2= stats_temp.getPlotPanels("temperature", interval=60)
+            fig_panels,labels_list = stats.getPlotPanels("power (Kw)", interval=interval) #una hora, y sin especificar lista para obtener todos
+            #fig_panels_temp, labels_list2= stats_temp.getPlotPanels("temperature", interval=60)
+            fig_panels_m8volts, labels_list2= stats_m8volts.getPlotPanels("Volts", interval=interval)
+            fig_panels_sspa_volts, labels_list2= stats_SSPAvolts.getPlotPanels("Volts", interval=interval)
+            fig_panels_volts_dir, labels_list2= stats_DIRvolts.getPlotPanels("Volts", interval=interval)
+            fig_panels_volts_rev, labels_list2= stats_REVvolts.getPlotPanels("Volts", interval=interval)
+
             panel_details=[]
             for panel in range(14):
                 panel_details.append(stats.getPanelDetail(n_panel=(panel+1)))
@@ -185,11 +209,13 @@ def main(kwargs):
             print("\nCreating panel figures...")
             for i in range(14):
 
-                # if panel_list != "all":
-                #     if str(i+1) not in panel_list.split(","):
-                #         continue
                 report.print_panel(fig_panels[i][0],fig_panels[i][1],panel_rates[i][0],panel_rates[i][1],labels_list[i])
-                report.print_panel2(panel_alarms_vswr[i],fig_panels_temp[i], None,None)
+
+                report.print_panel_alarm_temp(panel_alarms_vswr[i],fig_panels_m8volts[i], None,None)
+
+                report.print_panel_volts_sspa_tx(fig_panels_sspa_volts[i],fig_panels_volts_dir[i], fig_panels_volts_rev[i])
+
+
                 if flag_add_tables:
                     report.print_panel_detail(panel_details[i])
             print("Panel figures done")
@@ -260,13 +286,14 @@ def main(kwargs):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--report_name",type=str, default="pdf-amisr-report.pdf", help="name pdf file")
+    parser.add_argument("--author",type=str, default="Joab Apaza  e-mail:roj-op01@igp.gob.pe", help="user of the program")
 
     parser.add_argument("--read_write",type=str, default="read", help="read or write ")
     parser.add_argument("--online",default=False,action='store_true', help=" online or offline mode")
     parser.add_argument("--startDate",type=str, default=None, help="Date DD/MM/YYYY")
     parser.add_argument("--endDate",type=str, default=None, help="Date DD/MM/YYYY")
-    parser.add_argument("--interval",type=int, default='1', help="plot interval")
-    parser.add_argument("--interval_alarm",type=int, default='1', help="plot interval for alarm")
+    parser.add_argument("--interval",type=int, default='30', help="plot interval 0, 0.1, 0.5, 1, 2, 6, 12, 24")
+    parser.add_argument("--interval_alarm",type=int, default='30', help="plot interval for alarm")
     parser.add_argument("--host",type=str, default='10.10.40.121', help="IP server xml")
     parser.add_argument("--user",type=str, default='umetops', help="user")
     parser.add_argument("--password",type=str, default='amisr beam scan', help="password")
@@ -292,6 +319,7 @@ if __name__ == '__main__':
     parser.add_argument("--add_panels",type=bool, default=True, help="pages of panels")
     parser.add_argument("--dataType",type=str, default="power", help="data type read for processing")
     parser.add_argument("--no_removeOutliers", default=False, action='store_true', help="filter outliers")
+
 
     kwargs = parser.parse_args()
     ##print(kwargs)

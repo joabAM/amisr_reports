@@ -4,6 +4,7 @@ import datetime
 import time
 import os,glob,stat
 import os.path
+import sys
 
 from pandas.plotting import table
 import math
@@ -39,20 +40,27 @@ class STATS_AMISR():
         dataType = decodeDataType(type)
 
         self.work_path = os.getcwd()
-        if dataType == 1:
-            self.labels = pd.read_csv(self.work_path+"/labels-power.csv")
-            self.data.columns = self.labels.columns #etiquetas para cada columna
-            self.start_idx = 10
-        elif dataType ==2:
-            #print("loading default")
-            self.labels = pd.read_csv(self.work_path+"/labels-default.csv")
-            self.data.columns = self.labels.columns #etiquetas para cada columna
-            self.start_idx = 2
-        else:
-            self.labels = pd.read_csv(self.work_path+"/labels-default.csv")
-            self.data.columns = self.labels.columns #etiquetas para cada columna
-            self.start_idx = 2
-            #print("Data type: ",type)
+        try:
+            if dataType == 1:
+                self.labels = pd.read_csv(self.work_path+"/labels-power.csv")
+                self.data.columns = self.labels.columns #etiquetas para cada columna
+                self.start_idx = 10
+            elif dataType ==2:
+                #print("loading default")
+                self.labels = pd.read_csv(self.work_path+"/labels-default.csv")
+                self.data.columns = self.labels.columns #etiquetas para cada columna
+                self.start_idx = 2
+            else:
+                self.labels = pd.read_csv(self.work_path+"/labels-default.csv")
+                self.data.columns = self.labels.columns #etiquetas para cada columna
+                self.start_idx = 2
+                #print("Data type: ",type)
+        except Exception as e:
+            print("Error reading data")
+            print("Data: \n",self.data)
+            print("Labels: \n",self.labels.columns)
+            sys.exit()
+
         if panels=="all":
             self.panels_list = [1,2,3,4,5,6,7,8,9,10,11,12,13,14]
         else:
@@ -578,7 +586,7 @@ class STATS_AMISR():
 
             fig2 = self.plotAEU(panel, avg=interval,other_data=other_data, dataType=DataType) #AEUs
 
-            if DataType=="power" or DataType=="current":
+            if ("power" in DataType) or ("current" in DataType):
                 fig1 = self.plotAEU(panel, avg=interval,sum=True) #panel
                 figures.append([fig1,fig2])
             else:

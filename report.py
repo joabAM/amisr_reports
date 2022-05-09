@@ -317,17 +317,17 @@ panel {} and its fail rate with equal to {:.5f} AEU/hour.</p>""".format(label,ne
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
         self.pdf.image(img, x=110, y=60, h=72, w=80)
-
-        self.pdf.set_xy(10,160)
+        #######################################################################
+        self.pdf.set_xy(10,150)
         text="""<font size="12"><p>A general view of the power of the panel {} for each AEU is
 shown in the graph bellow:</p>""".format(label)
         self.pdf.write_html(text)
         figure = fig_aeu
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
-        self.pdf.image(img, x=20, y=180, h=100, w=150)
+        self.pdf.image(img, x=10, y=170, h=85, w=180)
 
-    def print_panel2(self, fig_alarm, fig_temp, tabla_html1, tabla_html2):
+    def print_panel_alarm_temp(self, fig_alarm, fig_temp, tabla_html1, tabla_html2):
 
         self.pdf.add_page()
 
@@ -339,16 +339,16 @@ shown in the graph bellow:</p>""".format(label)
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
         self.pdf.image(img, x=10, y=20, h=120, w=220)
-
+        #######################################################################
 
         self.pdf.set_xy(10,150)
-        text="""<font size="12"><p> Historical SSPA temperature of the panel</p>"""
+        text="""<font size="12"><p> Historical minus 8 volts of AEU of the panel</p>"""
         self.pdf.write_html(text)
 
         figure = fig_temp
         data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
-        self.pdf.image(img, x=10, y=160, h=120, w=180)
+        self.pdf.image(img, x=10, y=160, h=85, w=180)
 
         '''
         self.pdf.set_xy(10,160)
@@ -359,6 +359,39 @@ shown in the graph bellow:</p>""".format(label)
         img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
         self.pdf.image(img, x=20, y=180, h=100, w=150)
         '''
+    def print_panel_volts_sspa_tx(self, fig_sspa, fig_volts_dir, fig_volts_rev):
+
+        self.pdf.add_page()
+
+        self.pdf.set_xy(10,5)
+        text="""<font size="12"><p> Historical SSPA internal power source </p>"""
+        self.pdf.write_html(text)
+
+        figure = fig_sspa
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=10, y=15, h=85, w=180)
+
+        #######################################################################
+        self.pdf.set_xy(10,100)
+        text="""<font size="12"><p> Historical TX direct volts the panel for each AEU</p>"""
+        self.pdf.write_html(text)
+
+        figure = fig_volts_dir
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=10, y=110, h=85, w=180)
+
+        #######################################################################
+        self.pdf.set_xy(10,195)
+        text="""<font size="12"><p> Historical TX reverse volts the panel for each AEU</p>"""
+        self.pdf.write_html(text)
+
+        figure = fig_volts_rev
+        data = np.fromstring(figure.canvas.tostring_rgb(), dtype=np.uint8, sep='')
+        img = Image.frombytes('RGB', figure.canvas.get_width_height(),data)
+        self.pdf.image(img, x=10, y=205, h=85, w=180)
+
 
     def print_panel_detail(self, panel_text):
         self.pdf.add_page(orientation='L')
