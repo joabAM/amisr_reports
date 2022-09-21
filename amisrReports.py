@@ -122,7 +122,7 @@ def main(kwargs):
 
             #lectura de ALARMA, solo vswr, retorna data y date
 
-            DataAlarm = dbObj.readDB("alarm",startdate,enddate,aeuStatus = True,read_interval=0.1 ,alarmType="vswr")
+            DataAlarm = dbObj.readDB("alarm",startdate,enddate,aeuStatus = True,read_interval=interval_a ,alarmType="vswr")
             #Data_tempSSPA = dbObj.readDB("temperature1",startdate,enddate)
             Data_M8volts = dbObj.readDB("-8 volts",startdate,enddate)
             Data_SSPAvolts = dbObj.readDB("SSPA volts",startdate,enddate)
@@ -155,7 +155,7 @@ def main(kwargs):
             stats.updateStatusTable()#necesario para los valores del pie, y las tablas
 
             fig_alarm = stats.getPlotsAlarms(DataAlarm)
-            power_figure = stats.getPlotTotal(dataType,interval=60)
+            power_figure = stats.getPlotTotal(dataType,interval=interval)
             ##
 
             fig_intervals = stats.getTxIntervals()
@@ -292,8 +292,8 @@ if __name__ == '__main__':
     parser.add_argument("--online",default=False,action='store_true', help=" online or offline mode")
     parser.add_argument("--startDate",type=str, default=None, help="Date DD/MM/YYYY")
     parser.add_argument("--endDate",type=str, default=None, help="Date DD/MM/YYYY")
-    parser.add_argument("--interval",type=int, default='30', help="plot interval 0, 0.1, 0.5, 1, 2, 6, 12, 24")
-    parser.add_argument("--interval_alarm",type=int, default='30', help="plot interval for alarm")
+    parser.add_argument("--interval",type=int, default='30', help="plot interval in minutes")
+    parser.add_argument("--interval_alarm",type=int, default='30', help="plot interval for alarm 0, 0.1, 0.5, 1, 2, 6, 12, 24")
     parser.add_argument("--host",type=str, default='10.10.40.121', help="IP server xml")
     parser.add_argument("--user",type=str, default='umetops', help="user")
     parser.add_argument("--password",type=str, default='amisr beam scan', help="password")
@@ -317,7 +317,8 @@ if __name__ == '__main__':
     parser.add_argument("--add_tables",type=bool, default=True,help="tables of status per panel")
     parser.add_argument("--add_pie",type=bool, default=True, help="page of pie charts")
     parser.add_argument("--add_panels",type=bool, default=True, help="pages of panels")
-    parser.add_argument("--dataType",type=str, default="power", help="data type read for processing")
+    parser.add_argument("--dataType",type=str, default="power", help="""data type read for processing power", \
+                            "current", "alarm", "SSPA volts", "volts dir", "volts rev","-8 volts""")
     parser.add_argument("--no_removeOutliers", default=False, action='store_true', help="filter outliers")
 
 

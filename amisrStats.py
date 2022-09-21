@@ -98,6 +98,8 @@ class STATS_AMISR():
         self.hours = len(self.data)/60 #los datos están en minutos
 
         start_Tx = self.data.iloc[:1440,10:458] #primer dia de funcionamiento
+        start_Tx = self.data.iloc[:5,10:458] #primeros 5 minutos
+
         start_Tx = start_Tx.reset_index(drop=True)
         start_Tx = start_Tx.fillna(0)
         start_power = pd.DataFrame(start_Tx.mean(),columns=["start Watts"])
@@ -108,6 +110,8 @@ class STATS_AMISR():
 
 
         noTx = self.data.iloc[-1440:,10:458] #ultimo dia de funcionamiento
+        noTx = self.data.iloc[-5:,10:458] #ultimos 5 minutos
+
         #noTx.drop('index',inplace=True)
         noTx = noTx.reset_index(drop=True)
         noTx = noTx.fillna(0)
@@ -243,7 +247,12 @@ class STATS_AMISR():
 
             if m%2 == 0:
                 m += 1
-            df_filt = signal.medfilt(df.sum(axis=1).to_numpy(),59 ) #datos filtrados ahora en horas
+            df_filt = None
+            try:
+                df_filt = signal.medfilt(df.sum(axis=1).to_numpy(),59 ) #datos filtrados ahora en horas
+            except:
+                print("can't filter by hours")
+                df_filt = df.sum(axis=1)
             df_filt = pd.DataFrame(df_filt)
 
 
