@@ -293,7 +293,7 @@ if __name__ == '__main__':
     parser.add_argument("--startDate",type=str, default=None, help="Date DD/MM/YYYY")
     parser.add_argument("--endDate",type=str, default=None, help="Date DD/MM/YYYY")
     parser.add_argument("--interval",type=int, default='30', help="plot interval in minutes")
-    parser.add_argument("--interval_alarm",type=int, default='30', help="plot interval for alarm 0, 0.1, 0.5, 1, 2, 6, 12, 24")
+    parser.add_argument("--interval_alarm",type=float, default='30', help="plot interval for alarm 0, 0.1, 0.5, 1, 2, 6, 12, 24")
     parser.add_argument("--host",type=str, default='10.10.40.121', help="IP server xml")
     parser.add_argument("--user",type=str, default='umetops', help="user")
     parser.add_argument("--password",type=str, default='amisr beam scan', help="password")
