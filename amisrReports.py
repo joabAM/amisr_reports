@@ -47,7 +47,24 @@ plot_interval = 0.5
 
 curr_path = os.getcwd()
 dataBasePath = curr_path+"/dataBase/"
+powerCSVpath = curr_path+"/out_power/"
 bz2path = curr_path+"/bz2dir/"
+
+if os.path.exists(bz2path):
+    print("bz2path: ", bz2path)
+else :
+    os.mkdir(bz2path)
+
+if os.path.exists(powerCSVpath):
+    print("powerCSVpath: ", powerCSVpath)
+else :
+    os.mkdir(powerCSVpath)
+
+if os.path.exists(dataBasePath):
+    print("dataBasePath: ", dataBasePath)
+else :
+    os.mkdir(dataBasePath)
+
 typesData = ["power", "current", "alarm", "SSPA volts", "volts dir", "volts rev","-8 volts"]
 
 def main(kwargs):
@@ -77,6 +94,7 @@ def main(kwargs):
     filter_Npoints = keys.get("filter_points")
 
     flag_last_date = keys.get("check_last_date")
+    flag_powerCSV = keys.get("get_day_power")
 
     dataType = keys.get("dataType")
     interval = keys.get("interval")
@@ -103,9 +121,13 @@ def main(kwargs):
         dbObj.last_database_dates()
         return
 
+    if flag_powerCSV:
+        dbObj.getDayPower(powerCSVpath,startdate )
+        return
+
     if online:
         dbObj.run_online()
-
+        
     else:
         if flag_R_W=="write":
             if dataType == "all":
@@ -309,6 +331,7 @@ if __name__ == '__main__':
     parser.add_argument("--power_alert",type=int, default=150, help="minimum power to send alert")
 
     parser.add_argument("--check_last_date", default=False, help="show last dates of database files",action='store_true')
+    parser.add_argument("--get_day_power", default=False, help="show last dates of database files",action='store_true')
 
     parser.add_argument("--panels_list", default="all", type=str, help="list of panles to consider, from 1 to 14")
     parser.add_argument("--filter_points",type=int, default=8000, help="points for the fiter IRQ ")
