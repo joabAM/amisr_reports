@@ -130,7 +130,7 @@ def main(kwargs):
             Data_REVvolts = dbObj.readDB("volts rev",startdate,enddate)
 
 
-            stats = STATS_AMISR(type="power", data=DataDB, no_filt=noFilterOutliers, panels=panel_list)
+            stats = STATS_AMISR(type="power", data=DataDB, no_filt=noFilterOutliers, panels=panel_list,compensate_aeu=0)
 
             #stats_temp = STATS_AMISR(type="temperature1", data=Data_tempSSPA, no_filt=True, panels=panel_list)
             stats_m8volts = STATS_AMISR(type="-8 volts", data=Data_M8volts, no_filt=True, panels=panel_list)

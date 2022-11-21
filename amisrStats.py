@@ -33,12 +33,12 @@ class STATS_AMISR():
     enddate = None
 
 
-    def __init__(self,type="power", data=None, navg=1, no_filt=False, panels="all"):
+    def __init__(self,type="power", data=None, navg=1, no_filt=False, panels="all", compensate_aeu=0):
         if data == None:
             return
         self.data = pd.DataFrame(data, dtype='int32')
         dataType = decodeDataType(type)
-
+        self.compensate_aeu = compensate_aeu
         self.work_path = os.getcwd()
         try:
             if dataType == 1:
@@ -397,6 +397,10 @@ class STATS_AMISR():
 
             data = pd.Series(signal.medfilt(data.to_numpy(),59 )) #datos filtrados ahora en reduce ruido
             data = self.check_Outlier(data, points=filter_points)
+            if (self.compensate_aeu !=0):
+                n = len(data)
+                p = int(n*0.15)
+                data[-p:] = data[-p:] - int(self.compensate_aeu)
             fig_title = "AMISR-14 radar fail rate"
 
         else:
@@ -414,7 +418,7 @@ class STATS_AMISR():
             #y_pred, rate = get_rate(data)
             y_pred, rate = get_rate(data, func="polynomial", order=1)
             if rate < 0:
-                rate = 0.00001
+                rate = 0.00000001
         else:
             pass
 
