@@ -35,7 +35,7 @@ plot_pow = True  #mostrar gráficos en base a los parámetros lineas abajo
 # 3 = alarmas, 4 = temperaturas
 # 5 = SSPA volt,  6 = Voltajes dir,
 # 7 = volt rev
-DataType =3
+DataType =1
 #*****************
 #para guardar y visualizar temperatura
 temperatureType = 1 # 1 = temp SSPAs, 2 = temp CTRL
@@ -68,8 +68,8 @@ plot_format = '2' #1 plot equal date distance, fill no worked days, 2 plot only 
 #status_day = '2020-11-16' #descartado
 #alarmas
 status_range = [1,448] # ragno de aeu a visualizar 1 a 448
-start_plot_date = '2022-10-18'
-end_plot_date = '2022-10-21'
+start_plot_date = '2021-12-08'
+end_plot_date = '2022-12-12'
 # 1 = mostrat, 0 = ocultar
 show_plot = [1, 0, 0, 0] # grafico total, de panel, de aeu, n_pows, intervalos de potencia
 #cada AEU en la lista [row, col, n#]
@@ -91,9 +91,9 @@ aeus_plot_range =[21,32]
 panels_plot_list = [[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1]]
 #panels_plot_list = [[4,1],[3,2]]
 panel_average = False    #muestra una gŕafica adicional con la potencia promedio de los paneles
-show_plot_bar = True   #muestra barra de Gráficos en el último grafico
-#plot_interval = '0.5'    # valores validos 0 0.1 0.5  1  2  6 12 24 horas
-plot_interval = '0' #hours
+show_plot_bar = False   #muestra barra de Gráficos en el último grafico
+#plot_interval = '0.5'    # valores validos 0 0.1 0.5  1  2  6 12 24  120 240  480horas
+plot_interval = '120' #hours
 
 
 plot_interval_panel_list = [[1, 2], [2, 2], [7,2], [7,1]] # al estar vacio se omiten los gráficos
@@ -453,10 +453,10 @@ def plot_radar():
     global show_plot
     global aeus_plot_range
     show_all_panel = []  #número panel
-    valid_interval = [0, 0.1, 0.5, 1, 2, 6, 12, 24] #el doble de lo ingresado
+    valid_interval = [0, 0.1, 0.5, 1, 2, 6, 12, 24, 48, 120, 240, 480] #el doble de lo ingresado
     interval = float(plot_interval)  #
     if not(interval in valid_interval):
-        print("Invalid time interval for plot, use 0, '0.1', '0.5', '1', '2', '6', '12' or '24' hours")
+        print("Invalid time interval for plot, use 0, '0.1', '0.5', '1', '2', '6', '12' or '24' '48' 120 240 480hours")
         return
     interval *=60 # ahora interval en minutos interval = 2*15*plot_interval
     if interval == 0:

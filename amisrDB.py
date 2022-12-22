@@ -443,7 +443,81 @@ class DB_AMISR ():
         return
 
 
+    def getDayPower(self,outPath, powerDay_date=None ):
+        
+        if powerDay_date==None:
+            print("You must specify --startDate=nnnnn !")
+            return
+        ##reading current ##########################################################################
+        self.definePath(2)
+        day_lines = []
+        work_path = os.getcwd()
+        s_date = datetime.datetime.strptime(powerDay_date,"%Y/%m/%d").date()
+        labels = pd.read_csv(work_path+"/labels-default.csv")
 
+        if os.path.isfile(self.csvpathfile):
+            with fileinput.input([self.csvpathfile]) as csvFile:
+                index_line = 1   #  Nro de linea
+                valid_lines = 0
+                M = 0
+                #print("tot lines",len(lines))
+                date = None
+                for line in csvFile:          #cada línea de la lista son muestras cada 1 min
+                    line = line.rstrip("\n")
+                    line = line.split(",")
+                    date = datetime.datetime.strptime(line[0]+line[1],"%Y-%m-%d%H:%M:%S")
+
+                    if (date.date() == s_date ):       #datos para todo un día
+                        day_lines.append(line)
+
+        dataCurrent = pd.DataFrame(day_lines, dtype='int32')
+        dataCurrent.columns = labels.columns
+        dataCurrentF = fix_dataframe_date(dataCurrent)
+        dataCurrentF = dataCurrentF.drop(columns=['time'])
+        dataCurrentF.set_index("date", inplace=True)
+        #regular consumption AEU SSPA no TX = 0.3A, assumig extra 500mA electronics
+        dataCurrentF = dataCurrentF  - 0.35 
+        dataCurrentF[dataCurrentF<0] = 0
+
+
+        day_lines = []
+        ##reading sspa voltage############################################################################
+        self.definePath(5)
+        if os.path.isfile(self.csvpathfile):
+            with fileinput.input([self.csvpathfile]) as csvFile:
+                index_line = 1   #  Nro de linea
+                valid_lines = 0
+                M = 0
+                #print("tot lines",len(lines))
+                date = None
+                for line in csvFile:          #cada línea de la lista son muestras cada 1 min
+                    line = line.rstrip("\n")
+                    line = line.split(",")
+                    date = datetime.datetime.strptime(line[0]+line[1],"%Y-%m-%d%H:%M:%S")
+                    if (date.date() == s_date ):       #datos para todo un día
+                        day_lines.append(line)
+
+        dataSSPAVolts = pd.DataFrame(day_lines, dtype='int32')
+        dataSSPAVolts.columns = labels.columns
+        dataSSPAVoltsF = fix_dataframe_date(dataSSPAVolts)
+        dataSSPAVoltsF = dataSSPAVoltsF.drop(columns=['time'])
+        dataSSPAVoltsF.set_index("date", inplace=True)
+
+        if (len(dataSSPAVoltsF)!= len(dataCurrentF)):
+            print("Error data lenght  current and voltage")
+            print(len(dataCurrentF), len(dataSSPAVoltsF))
+            return False
+        avgPower = pd.DataFrame(dataCurrentF.values*dataSSPAVoltsF.values, index=dataCurrentF.index)
+        #efficiency of BLF369 is ~55% for pulsed wave under 10% of duty cycle
+        avgPower = avgPower*0.5 #considering 50%
+        #the replected power in the antenna is 10 to 12%, so we use 11% for all aeu
+        avgPower = avgPower*0.89 #considering 11% as reflected power
+        f = avgPower.sum(axis=1)
+        name = "power_"+powerDay_date.replace("/","")+'.csv'
+        filename = os.path.join(outPath, name)
+        f.to_csv(filename)
+        print("Created fle: {}".format(filename))
+        return True
 
     def readDB(self,dataType, start_plot_date,end_plot_date, aeuStatus = False,read_interval="0.1", alarmType="none"):
         strdata = dataType
